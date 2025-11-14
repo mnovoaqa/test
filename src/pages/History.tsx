@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { format, startOfMonth, endOfMonth, eachDayOfInterval, isSameMonth, isSameDay, addMonths, subMonths } from 'date-fns';
-import type { Meal } from '../types';
+import type { Meal, DayData } from '../types';
 import { getAppData, getDayData, addMeal, updateMeal, deleteMeal } from '../utils/storage';
 import './History.css';
 
@@ -10,10 +10,15 @@ export default function History() {
   const [editingMeal, setEditingMeal] = useState<Meal | null>(null);
   const [showAddMeal, setShowAddMeal] = useState(false);
   const [meals, setMeals] = useState<Meal[]>([]);
+  const [monthData, setMonthData] = useState<Record<string, DayData>>({});
 
   const monthStart = startOfMonth(currentMonth);
   const monthEnd = endOfMonth(currentMonth);
   const calendarDays = eachDayOfInterval({ start: monthStart, end: monthEnd });
+
+  useEffect(() => {
+    loadMonthData();
+  }, [currentMonth]);
 
   useEffect(() => {
     if (selectedDate) {
@@ -21,15 +26,19 @@ export default function History() {
     }
   }, [selectedDate]);
 
-  const loadMeals = (date: string) => {
-    const dayData = getDayData(date);
+  const loadMonthData = async () => {
+    const appData = await getAppData();
+    setMonthData(appData.days);
+  };
+
+  const loadMeals = async (date: string) => {
+    const dayData = await getDayData(date);
     setMeals(dayData.meals);
   };
 
   const getDayTotals = (date: Date) => {
     const dateStr = format(date, 'yyyy-MM-dd');
-    const appData = getAppData();
-    const dayData = appData.days[dateStr];
+    const dayData = monthData[dateStr];
 
     if (!dayData || !dayData.meals || dayData.meals.length === 0) {
       return null;
@@ -61,7 +70,7 @@ export default function History() {
     setShowAddMeal(false);
   };
 
-  const handleAddMeal = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAddMeal = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedDate) return;
 
@@ -78,12 +87,13 @@ export default function History() {
       timestamp: new Date(selectedDate).toISOString(),
     };
 
-    addMeal(selectedDate, newMeal);
-    loadMeals(selectedDate);
+    await addMeal(selectedDate, newMeal);
+    await loadMeals(selectedDate);
+    await loadMonthData();
     setShowAddMeal(false);
   };
 
-  const handleUpdateMeal = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleUpdateMeal = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     if (!selectedDate || !editingMeal) return;
 
@@ -99,15 +109,17 @@ export default function History() {
       },
     };
 
-    updateMeal(selectedDate, editingMeal.id, updatedMeal);
-    loadMeals(selectedDate);
+    await updateMeal(selectedDate, editingMeal.id, updatedMeal);
+    await loadMeals(selectedDate);
+    await loadMonthData();
     setEditingMeal(null);
   };
 
-  const handleDeleteMeal = (mealId: string) => {
+  const handleDeleteMeal = async (mealId: string) => {
     if (!selectedDate) return;
-    deleteMeal(selectedDate, mealId);
-    loadMeals(selectedDate);
+    await deleteMeal(selectedDate, mealId);
+    await loadMeals(selectedDate);
+    await loadMonthData();
   };
 
   const startEditingMeal = (meal: Meal) => {

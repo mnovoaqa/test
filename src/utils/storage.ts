@@ -1,6 +1,6 @@
 import type { AppData, Goals, DayData, Meal } from '../types';
-
-const STORAGE_KEY = 'calorie-tracker-data';
+import { supabase } from '../lib/supabase';
+import { format } from 'date-fns';
 
 const defaultGoals: Goals = {
   calories: 2000,
@@ -9,60 +9,174 @@ const defaultGoals: Goals = {
   fat: 65,
 };
 
-export const getAppData = (): AppData => {
-  const stored = localStorage.getItem(STORAGE_KEY);
-  if (stored) {
-    try {
-      return JSON.parse(stored);
-    } catch {
-      return { days: {}, goals: defaultGoals };
-    }
+// Get all app data (for backward compatibility)
+export const getAppData = async (): Promise<AppData> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { days: {}, goals: defaultGoals };
+
+  const [mealsResult, goalsResult] = await Promise.all([
+    supabase.from('meals').select('*').eq('user_id', user.id),
+    supabase.from('goals').select('*').eq('user_id', user.id).single()
+  ]);
+
+  const days: Record<string, DayData> = {};
+
+  if (mealsResult.data) {
+    mealsResult.data.forEach((meal: any) => {
+      const dateStr = meal.meal_date;
+      if (!days[dateStr]) {
+        days[dateStr] = { date: dateStr, meals: [] };
+      }
+      days[dateStr].meals.push({
+        id: meal.id,
+        name: meal.name,
+        calories: meal.calories,
+        macros: {
+          protein: parseFloat(meal.protein),
+          carbs: parseFloat(meal.carbs),
+          fat: parseFloat(meal.fat),
+        },
+        timestamp: meal.timestamp,
+      });
+    });
   }
-  return { days: {}, goals: defaultGoals };
+
+  return {
+    days,
+    goals: goalsResult.data ? {
+      calories: goalsResult.data.calories,
+      protein: goalsResult.data.protein,
+      carbs: goalsResult.data.carbs,
+      fat: goalsResult.data.fat,
+    } : defaultGoals,
+  };
 };
 
-export const saveAppData = (data: AppData): void => {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+export const getDayData = async (date: string): Promise<DayData> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return { date, meals: [] };
+
+  const { data: meals } = await supabase
+    .from('meals')
+    .select('*')
+    .eq('user_id', user.id)
+    .eq('meal_date', date)
+    .order('timestamp', { ascending: true });
+
+  return {
+    date,
+    meals: meals ? meals.map((meal: any) => ({
+      id: meal.id,
+      name: meal.name,
+      calories: meal.calories,
+      macros: {
+        protein: parseFloat(meal.protein),
+        carbs: parseFloat(meal.carbs),
+        fat: parseFloat(meal.fat),
+      },
+      timestamp: meal.timestamp,
+    })) : []
+  };
 };
 
-export const getDayData = (date: string): DayData => {
-  const appData = getAppData();
-  return appData.days[date] || { date, meals: [] };
+export const addMeal = async (date: string, meal: Meal): Promise<void> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
+  await supabase.from('meals').insert({
+    user_id: user.id,
+    name: meal.name,
+    calories: meal.calories,
+    protein: meal.macros.protein,
+    carbs: meal.macros.carbs,
+    fat: meal.macros.fat,
+    meal_date: date,
+    timestamp: meal.timestamp,
+  });
 };
 
-export const saveDayData = (dayData: DayData): void => {
-  const appData = getAppData();
-  appData.days[dayData.date] = dayData;
-  saveAppData(appData);
+export const updateMeal = async (date: string, mealId: string, updatedMeal: Meal): Promise<void> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
+  await supabase
+    .from('meals')
+    .update({
+      name: updatedMeal.name,
+      calories: updatedMeal.calories,
+      protein: updatedMeal.macros.protein,
+      carbs: updatedMeal.macros.carbs,
+      fat: updatedMeal.macros.fat,
+    })
+    .eq('id', mealId)
+    .eq('user_id', user.id);
 };
 
-export const addMeal = (date: string, meal: Meal): void => {
-  const dayData = getDayData(date);
-  dayData.meals.push(meal);
-  saveDayData(dayData);
+export const deleteMeal = async (date: string, mealId: string): Promise<void> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
+  await supabase
+    .from('meals')
+    .delete()
+    .eq('id', mealId)
+    .eq('user_id', user.id);
 };
 
-export const updateMeal = (date: string, mealId: string, updatedMeal: Meal): void => {
-  const dayData = getDayData(date);
-  const index = dayData.meals.findIndex(m => m.id === mealId);
-  if (index !== -1) {
-    dayData.meals[index] = updatedMeal;
-    saveDayData(dayData);
+export const getGoals = async (): Promise<Goals> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) return defaultGoals;
+
+  const { data } = await supabase
+    .from('goals')
+    .select('*')
+    .eq('user_id', user.id)
+    .single();
+
+  if (!data) {
+    // Create default goals for new user
+    await supabase.from('goals').insert({
+      user_id: user.id,
+      ...defaultGoals,
+    });
+    return defaultGoals;
+  }
+
+  return {
+    calories: data.calories,
+    protein: data.protein,
+    carbs: data.carbs,
+    fat: data.fat,
+  };
+};
+
+export const saveGoals = async (goals: Goals): Promise<void> => {
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error('User not authenticated');
+
+  const { data: existing } = await supabase
+    .from('goals')
+    .select('id')
+    .eq('user_id', user.id)
+    .single();
+
+  if (existing) {
+    await supabase
+      .from('goals')
+      .update(goals)
+      .eq('user_id', user.id);
+  } else {
+    await supabase
+      .from('goals')
+      .insert({
+        user_id: user.id,
+        ...goals,
+      });
   }
 };
 
-export const deleteMeal = (date: string, mealId: string): void => {
-  const dayData = getDayData(date);
-  dayData.meals = dayData.meals.filter(m => m.id !== mealId);
-  saveDayData(dayData);
-};
-
-export const getGoals = (): Goals => {
-  return getAppData().goals;
-};
-
-export const saveGoals = (goals: Goals): void => {
-  const appData = getAppData();
-  appData.goals = goals;
-  saveAppData(appData);
+// Keep saveDayData for backward compatibility (not used with Supabase)
+export const saveDayData = async (dayData: DayData): Promise<void> => {
+  // This function is not needed with Supabase as we handle individual meals
+  console.warn('saveDayData is deprecated with Supabase');
 };

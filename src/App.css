@@ -76,9 +76,48 @@
   font-size: 1.2rem;
 }
 
+.nav-link.logout {
+  margin-left: 1rem;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.nav-link.logout:hover {
+  background: rgba(255, 100, 100, 0.2);
+  border-color: rgba(255, 100, 100, 0.4);
+}
+
 .main-content {
   flex: 1;
   overflow-y: auto;
+}
+
+.loading-screen {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+}
+
+.loading-content {
+  text-align: center;
+  color: white;
+}
+
+.loading-icon {
+  font-size: 64px;
+  display: block;
+  margin-bottom: 16px;
+  animation: bounce 1s infinite;
+}
+
+@keyframes bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-20px); }
+}
+
+.loading-content p {
+  font-size: 18px;
+  opacity: 0.9;
 }
 
 /* Remove default button styles */

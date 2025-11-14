@@ -1,13 +1,43 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import './App.css'
 import Today from './pages/Today'
 import History from './pages/History'
 import Settings from './pages/Settings'
+import Auth from './pages/Auth'
+import { AuthProvider, useAuth } from './contexts/AuthContext'
+import { migrateLocalDataToSupabase, hasBeenMigrated } from './utils/migration'
 
 type Page = 'today' | 'history' | 'settings'
 
-function App() {
+function AppContent() {
   const [currentPage, setCurrentPage] = useState<Page>('today')
+  const [migrating, setMigrating] = useState(false)
+  const { user, loading, signOut } = useAuth()
+
+  useEffect(() => {
+    // Migrate local data when user logs in for the first time
+    if (user && !hasBeenMigrated()) {
+      setMigrating(true)
+      migrateLocalDataToSupabase().then(() => {
+        setMigrating(false)
+      })
+    }
+  }, [user])
+
+  if (loading || migrating) {
+    return (
+      <div className="app loading-screen">
+        <div className="loading-content">
+          <span className="loading-icon">🥗</span>
+          <p>{migrating ? 'Migrating your data...' : 'Loading...'}</p>
+        </div>
+      </div>
+    )
+  }
+
+  if (!user) {
+    return <Auth />
+  }
 
   const renderPage = () => {
     switch (currentPage) {
@@ -51,12 +81,27 @@ function App() {
             <span className="nav-icon">⚙️</span>
             Settings
           </button>
+          <button
+            className="nav-link logout"
+            onClick={signOut}
+          >
+            <span className="nav-icon">🚪</span>
+            Logout
+          </button>
         </div>
       </nav>
       <main className="main-content">
         {renderPage()}
       </main>
     </div>
+  )
+}
+
+function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   )
 }
 

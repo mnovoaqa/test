@@ -4,14 +4,24 @@ import { getGoals, saveGoals } from '../utils/storage';
 import './Settings.css';
 
 export default function Settings() {
-  const [goals, setGoals] = useState<Goals>(getGoals());
+  const [goals, setGoals] = useState<Goals>({
+    calories: 2000,
+    protein: 150,
+    carbs: 250,
+    fat: 65,
+  });
   const [saved, setSaved] = useState(false);
 
   useEffect(() => {
-    setGoals(getGoals());
+    loadGoals();
   }, []);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const loadGoals = async () => {
+    const userGoals = await getGoals();
+    setGoals(userGoals);
+  };
+
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
 
@@ -22,7 +32,7 @@ export default function Settings() {
       fat: Number(formData.get('fat')),
     };
 
-    saveGoals(newGoals);
+    await saveGoals(newGoals);
     setGoals(newGoals);
     setSaved(true);
 

@@ -17,15 +17,16 @@ export default function Today() {
     loadData();
   }, []);
 
-  const loadData = () => {
-    const dayData = getDayData(today);
+  const loadData = async () => {
+    const dayData = await getDayData(today);
     setMeals(dayData.meals);
-    setGoals(getGoals());
+    const userGoals = await getGoals();
+    setGoals(userGoals);
     loadTrendData();
   };
 
-  const loadTrendData = () => {
-    const appData = getAppData();
+  const loadTrendData = async () => {
+    const appData = await getAppData();
     const data = [];
     const now = new Date();
 
@@ -61,7 +62,7 @@ export default function Today() {
     setTrendData(data);
   };
 
-  const handleAddMeal = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleAddMeal = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const formData = new FormData(e.currentTarget);
 
@@ -77,13 +78,13 @@ export default function Today() {
       timestamp: new Date().toISOString(),
     };
 
-    addMeal(today, newMeal);
+    await addMeal(today, newMeal);
     loadData();
     setShowAddMeal(false);
   };
 
-  const handleDeleteMeal = (mealId: string) => {
-    deleteMeal(today, mealId);
+  const handleDeleteMeal = async (mealId: string) => {
+    await deleteMeal(today, mealId);
     loadData();
   };
 
