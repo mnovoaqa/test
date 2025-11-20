@@ -7,6 +7,7 @@ export class NotificationService {
   constructor() {
     this.initializeAudioContext()
     this.requestNotificationPermission()
+    this.setupAudioResume()
   }
 
   private initializeAudioContext() {
@@ -15,6 +16,48 @@ export class NotificationService {
     } catch (error) {
       console.error('Audio context not supported:', error)
     }
+  }
+
+  /**
+   * Setup audio context resume on user interaction
+   * Required for browsers that block autoplay
+   */
+  private setupAudioResume() {
+    const resumeAudio = () => {
+      if (this.audioContext && this.audioContext.state === 'suspended') {
+        this.audioContext.resume().then(() => {
+          console.log('Audio context resumed successfully')
+        })
+      }
+    }
+
+    // Resume on various user interactions
+    const events = ['click', 'touchstart', 'keydown']
+    events.forEach(event => {
+      document.addEventListener(event, resumeAudio, { once: true })
+    })
+  }
+
+  /**
+   * Ensure audio context is ready before playing
+   */
+  private async ensureAudioReady(): Promise<boolean> {
+    if (!this.audioContext) {
+      console.warn('Audio context not available')
+      return false
+    }
+
+    if (this.audioContext.state === 'suspended') {
+      try {
+        await this.audioContext.resume()
+        console.log('Audio context resumed for alert')
+      } catch (error) {
+        console.error('Failed to resume audio context:', error)
+        return false
+      }
+    }
+
+    return true
   }
 
   async requestNotificationPermission() {
@@ -27,8 +70,15 @@ export class NotificationService {
    * Play EPIC alert sound - Movie trailer style!
    * @param config Alert configuration
    */
-  playAlertSound(config: AlertConfig) {
-    if (!config.enableSound || !this.audioContext) {
+  async playAlertSound(config: AlertConfig) {
+    if (!config.enableSound) {
+      return
+    }
+
+    // Ensure audio context is ready
+    const isReady = await this.ensureAudioReady()
+    if (!isReady || !this.audioContext) {
+      console.warn('Audio context not ready for alert sound')
       return
     }
 
@@ -317,8 +367,8 @@ export class NotificationService {
    * @param alert Alert data
    * @param config Alert configuration
    */
-  handleAlert(alert: Alert, config: AlertConfig) {
-    this.playAlertSound(config)
+  async handleAlert(alert: Alert, config: AlertConfig) {
+    await this.playAlertSound(config)
     this.showPushNotification(alert, config)
     this.triggerStrobeEffect(2000)
     this.sendWebhook(alert, config)

@@ -3,11 +3,12 @@ import './App.css'
 import Dashboard from './pages/Dashboard'
 import Watchlist from './pages/Watchlist'
 import CryptoSettings from './pages/CryptoSettings'
+import Chart from './pages/Chart'
 import AlertHistory from './components/AlertHistory'
 import TradeCalculator from './components/TradeCalculator'
 import { useCryptoStore } from './stores/cryptoStore'
 
-type Page = 'dashboard' | 'watchlist' | 'alerts' | 'calculator' | 'settings'
+type Page = 'dashboard' | 'watchlist' | 'chart' | 'alerts' | 'calculator' | 'settings'
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard')
@@ -24,6 +25,8 @@ function App() {
         return <Dashboard />
       case 'watchlist':
         return <Watchlist />
+      case 'chart':
+        return <Chart />
       case 'alerts':
         return <AlertHistory />
       case 'calculator':
@@ -58,6 +61,14 @@ function App() {
           >
             <span className="nav-icon">⭐</span>
             Watchlist
+          </button>
+          <button
+            className={`nav-link ${currentPage === 'chart' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('chart')}
+            title="Live Chart"
+          >
+            <span className="nav-icon">📈</span>
+            Chart
           </button>
           <button
             className={`nav-link ${currentPage === 'alerts' ? 'active' : ''}`}

@@ -132,7 +132,7 @@ export class TechnicalIndicatorsCalculator {
   }
 
   /**
-   * Calculate EMA (Exponential Moving Average)
+   * Calculate EMA (Exponential Moving Average) - single value
    * @param prices Array of historical prices
    * @param period Period for EMA calculation
    */
@@ -149,6 +149,88 @@ export class TechnicalIndicatorsCalculator {
     }
 
     return ema
+  }
+
+  /**
+   * Calculate EMA series (Exponential Moving Average) - returns array
+   * @param prices Array of historical prices
+   * @param period Period for EMA calculation
+   */
+  static calculateEMASeries(prices: number[], period: number): number[] {
+    if (prices.length < period) {
+      return []
+    }
+
+    const multiplier = 2 / (period + 1)
+    const result: number[] = []
+    let ema = prices.slice(0, period).reduce((sum, price) => sum + price, 0) / period
+
+    for (let i = period; i < prices.length; i++) {
+      ema = (prices[i] - ema) * multiplier + ema
+      result.push(ema)
+    }
+
+    return result
+  }
+
+  /**
+   * Calculate SMA series (Simple Moving Average) - returns array
+   * @param prices Array of historical prices
+   * @param period Period for SMA calculation
+   */
+  static calculateSMASeries(prices: number[], period: number): number[] {
+    if (prices.length < period) {
+      return []
+    }
+
+    const result: number[] = []
+    for (let i = period - 1; i < prices.length; i++) {
+      const slice = prices.slice(i - period + 1, i + 1)
+      const sma = slice.reduce((sum, price) => sum + price, 0) / period
+      result.push(sma)
+    }
+
+    return result
+  }
+
+  /**
+   * Calculate Bollinger Bands series - returns arrays for charting
+   * @param prices Array of historical prices
+   * @param period Period for calculation (default: 20)
+   * @param stdDev Standard deviation multiplier (default: 2)
+   */
+  static calculateBollingerBandsSeries(
+    prices: number[],
+    period: number = 20,
+    stdDev: number = 2
+  ): {
+    upper: number[]
+    middle: number[]
+    lower: number[]
+  } {
+    if (prices.length < period) {
+      return { upper: [], middle: [], lower: [] }
+    }
+
+    const upper: number[] = []
+    const middle: number[] = []
+    const lower: number[] = []
+
+    for (let i = period - 1; i < prices.length; i++) {
+      const slice = prices.slice(i - period + 1, i + 1)
+      const sma = slice.reduce((sum, price) => sum + price, 0) / period
+
+      // Calculate standard deviation
+      const squaredDiffs = slice.map((price) => Math.pow(price - sma, 2))
+      const variance = squaredDiffs.reduce((sum, diff) => sum + diff, 0) / period
+      const standardDeviation = Math.sqrt(variance)
+
+      upper.push(sma + stdDev * standardDeviation)
+      middle.push(sma)
+      lower.push(sma - stdDev * standardDeviation)
+    }
+
+    return { upper, middle, lower }
   }
 
   /**
