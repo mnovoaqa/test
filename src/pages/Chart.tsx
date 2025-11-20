@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { createChart, LineStyle, CrosshairMode } from 'lightweight-charts'
-import type { IChartApi, Time } from 'lightweight-charts'
+import type { Time } from 'lightweight-charts'
 import { useCryptoStore } from '../stores/cryptoStore'
 import { alertService } from '../services/alertService'
 import { TechnicalIndicatorsCalculator } from '../services/technicalIndicators'
@@ -17,9 +17,9 @@ export default function Chart() {
   const [chartReady, setChartReady] = useState(false)
 
   const chartContainerRef = useRef<HTMLDivElement>(null)
-  const chartRef = useRef<IChartApi | null>(null)
+  const chartRef = useRef<any>(null) // Using any for lightweight-charts v5 API compatibility
   const rsiContainerRef = useRef<HTMLDivElement>(null)
-  const rsiChartRef = useRef<IChartApi | null>(null)
+  const rsiChartRef = useRef<any>(null) // Using any for lightweight-charts v5 API compatibility
   const seriesRefs = useRef<any[]>([])
   const rsiSeriesRefs = useRef<any[]>([])
 
@@ -143,7 +143,7 @@ export default function Chart() {
     const priceHistory = alertService.getPriceHistory(selectedCoin)
 
     if (priceHistory.length === 0) {
-      console.log('No price history available')
+      console.log('No price history available yet - waiting for data collection')
       return
     }
 
@@ -151,7 +151,7 @@ export default function Chart() {
     const candleData = aggregateToCandlesticks(priceHistory, timeframe)
 
     if (candleData.length === 0) {
-      console.log('No candle data after aggregation')
+      console.log('No candle data after aggregation - need more data points')
       return
     }
 
@@ -166,13 +166,6 @@ export default function Chart() {
       })
       seriesRefs.current = []
 
-      // Verify chart instance has the method
-      if (typeof chartRef.current.addCandlestickSeries !== 'function') {
-        console.error('addCandlestickSeries is not a function on chart instance:', chartRef.current)
-        console.error('Available methods:', Object.keys(chartRef.current))
-        return
-      }
-
       // Add candlestick series
       const candlestickSeries = chartRef.current.addCandlestickSeries({
         upColor: '#26a69a',
@@ -182,13 +175,7 @@ export default function Chart() {
         wickDownColor: '#ef5350',
       })
 
-      console.log('Candlestick series created successfully')
-    } catch (error) {
-      console.error('Error creating candlestick series:', error)
-      return
-    }
-
-    try {
+      // Set candlestick data
       const mappedCandles = candleData.map(c => ({
         time: c.time as Time,
         open: c.open,
@@ -199,9 +186,9 @@ export default function Chart() {
 
       candlestickSeries.setData(mappedCandles)
       seriesRefs.current.push(candlestickSeries)
-      console.log('Candlestick data set successfully')
+      console.log('Candlestick series created and data set successfully')
     } catch (error) {
-      console.error('Error setting candlestick data:', error)
+      console.error('Error creating/setting candlestick series:', error)
       return
     }
 
@@ -445,6 +432,10 @@ export default function Chart() {
   const currentPrice = currentCoin?.current_price || 0
   const priceChange24h = currentCoin?.price_change_percentage_24h || 0
 
+  // Force re-render when price history updates by watching cryptoList
+  // This ensures the empty state disappears once data is available
+  const hasData = priceHistory.length > 0
+
   return (
     <div className="chart-page">
       <div className="chart-header">
@@ -531,7 +522,33 @@ export default function Chart() {
         </div>
       </div>
 
-      <div className="chart-container" ref={chartContainerRef} />
+      <div className="chart-wrapper">
+        <div className="chart-container" ref={chartContainerRef} />
+
+        {!chartReady && (
+          <div className="chart-empty-state">
+            <div className="empty-state-content">
+              <div className="loading-spinner"></div>
+              <h3>Initializing Chart...</h3>
+              <p>Setting up the charting engine</p>
+            </div>
+          </div>
+        )}
+
+        {chartReady && !hasData && (
+          <div className="chart-empty-state">
+            <div className="empty-state-content">
+              <svg className="empty-state-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
+              </svg>
+              <h3>Collecting Price Data...</h3>
+              <p>The chart will appear once enough data points are collected.</p>
+              <p className="data-status">Current data points: <strong>{priceHistory.length}</strong></p>
+              <p className="wait-message">Price updates occur every 10 seconds. Please wait a moment.</p>
+            </div>
+          </div>
+        )}
+      </div>
 
       {activeIndicators.has('rsi') && (
         <div className="rsi-container">
