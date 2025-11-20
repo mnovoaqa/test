@@ -5,11 +5,13 @@ export class AlertService {
   private priceHistory: Map<string, PriceHistory[]> = new Map()
   private volumeHistory: Map<string, number[]> = new Map()
   private alertHistory: Alert[] = []
-  private triggeredAlerts: Set<string> = new Set()
+  private triggeredAlerts: Map<string, number> = new Map() // coinId_type -> timestamp
+  private mutedCoins: Set<string> = new Set()
   private alertCallbacks: ((alert: Alert) => void)[] = []
 
   private readonly PRICE_HISTORY_LIMIT = 100
   private readonly VOLUME_HISTORY_LIMIT = 100
+  private readonly ALERT_COOLDOWN = 300000 // 5 minutes in milliseconds
 
   /**
    * Add price data to history
@@ -40,12 +42,62 @@ export class AlertService {
   }
 
   /**
+   * Check if alert can be triggered (not in cooldown)
+   */
+  private canTriggerAlert(coinId: string, alertType: string): boolean {
+    const alertKey = `${coinId}_${alertType}`
+    const lastTriggered = this.triggeredAlerts.get(alertKey)
+
+    if (!lastTriggered) {
+      return true
+    }
+
+    const timeSinceLastAlert = Date.now() - lastTriggered
+    return timeSinceLastAlert >= this.ALERT_COOLDOWN
+  }
+
+  /**
+   * Mark alert as triggered
+   */
+  private markAlertTriggered(coinId: string, alertType: string) {
+    const alertKey = `${coinId}_${alertType}`
+    this.triggeredAlerts.set(alertKey, Date.now())
+  }
+
+  /**
+   * Mute alerts for a specific coin
+   */
+  muteCoin(coinId: string) {
+    this.mutedCoins.add(coinId)
+  }
+
+  /**
+   * Unmute alerts for a specific coin
+   */
+  unmuteCoin(coinId: string) {
+    this.mutedCoins.delete(coinId)
+  }
+
+  /**
+   * Check if a coin is muted
+   */
+  isCoinMuted(coinId: string): boolean {
+    return this.mutedCoins.has(coinId)
+  }
+
+  /**
    * Check for parabolic price movement
    * @param coinData Current cryptocurrency data
    * @param config Alert configuration
    */
   checkForAlerts(coinData: CryptoData, config: AlertConfig): Alert[] {
     const alerts: Alert[] = []
+
+    // Skip if coin is muted
+    if (this.mutedCoins.has(coinData.id)) {
+      return alerts
+    }
+
     const history = this.priceHistory.get(coinData.id) || []
     const volumeHist = this.volumeHistory.get(coinData.id) || []
 
@@ -69,11 +121,9 @@ export class AlertService {
       const priceChangePercent = (priceChange / oldestPrice) * 100
 
       if (Math.abs(priceChangePercent) >= config.priceChangeThreshold) {
-        const alertId = `${coinData.id}_price_${currentTime}`
-
-        if (!this.triggeredAlerts.has(alertId)) {
+        if (this.canTriggerAlert(coinData.id, 'price_spike')) {
           const alert: Alert = {
-            id: alertId,
+            id: `${coinData.id}_price_${currentTime}`,
             coinId: coinData.id,
             coinSymbol: coinData.symbol.toUpperCase(),
             coinName: coinData.name,
@@ -90,7 +140,7 @@ export class AlertService {
           }
 
           alerts.push(alert)
-          this.triggeredAlerts.add(alertId)
+          this.markAlertTriggered(coinData.id, 'price_spike')
           this.addToHistory(alert)
         }
       }
@@ -105,13 +155,12 @@ export class AlertService {
       )
 
       if (isSpike) {
-        const avgVolume = TechnicalIndicatorsCalculator.calculateVolumeAverage(volumeHist)
-        const volumeIncrease = ((currentVolume - avgVolume) / avgVolume) * 100
-        const alertId = `${coinData.id}_volume_${currentTime}`
+        if (this.canTriggerAlert(coinData.id, 'volume_spike')) {
+          const avgVolume = TechnicalIndicatorsCalculator.calculateVolumeAverage(volumeHist)
+          const volumeIncrease = ((currentVolume - avgVolume) / avgVolume) * 100
 
-        if (!this.triggeredAlerts.has(alertId)) {
           const alert: Alert = {
-            id: alertId,
+            id: `${coinData.id}_volume_${currentTime}`,
             coinId: coinData.id,
             coinSymbol: coinData.symbol.toUpperCase(),
             coinName: coinData.name,
@@ -129,7 +178,7 @@ export class AlertService {
           }
 
           alerts.push(alert)
-          this.triggeredAlerts.add(alertId)
+          this.markAlertTriggered(coinData.id, 'volume_spike')
           this.addToHistory(alert)
         }
       }
@@ -142,11 +191,9 @@ export class AlertService {
 
       // RSI Oversold
       if (rsi < config.rsiOversold) {
-        const alertId = `${coinData.id}_rsi_oversold_${currentTime}`
-
-        if (!this.triggeredAlerts.has(alertId)) {
+        if (this.canTriggerAlert(coinData.id, 'rsi_oversold')) {
           const alert: Alert = {
-            id: alertId,
+            id: `${coinData.id}_rsi_oversold_${currentTime}`,
             coinId: coinData.id,
             coinSymbol: coinData.symbol.toUpperCase(),
             coinName: coinData.name,
@@ -164,18 +211,16 @@ export class AlertService {
           }
 
           alerts.push(alert)
-          this.triggeredAlerts.add(alertId)
+          this.markAlertTriggered(coinData.id, 'rsi_oversold')
           this.addToHistory(alert)
         }
       }
 
       // RSI Overbought
       if (rsi > config.rsiOverbought) {
-        const alertId = `${coinData.id}_rsi_overbought_${currentTime}`
-
-        if (!this.triggeredAlerts.has(alertId)) {
+        if (this.canTriggerAlert(coinData.id, 'rsi_overbought')) {
           const alert: Alert = {
-            id: alertId,
+            id: `${coinData.id}_rsi_overbought_${currentTime}`,
             coinId: coinData.id,
             coinSymbol: coinData.symbol.toUpperCase(),
             coinName: coinData.name,
@@ -193,7 +238,7 @@ export class AlertService {
           }
 
           alerts.push(alert)
-          this.triggeredAlerts.add(alertId)
+          this.markAlertTriggered(coinData.id, 'rsi_overbought')
           this.addToHistory(alert)
         }
       }
@@ -253,6 +298,13 @@ export class AlertService {
    */
   clearTriggeredAlerts() {
     this.triggeredAlerts.clear()
+  }
+
+  /**
+   * Get list of muted coins
+   */
+  getMutedCoins(): string[] {
+    return Array.from(this.mutedCoins)
   }
 
   /**

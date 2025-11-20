@@ -5,6 +5,7 @@ import { useCryptoStore } from '../stores/cryptoStore'
 
 export default function AlertHistory() {
   const [alerts, setAlerts] = useState<Alert[]>([])
+  const [contextMenu, setContextMenu] = useState<{ x: number; y: number; coinId: string; coinName: string } | null>(null)
   const { clearAlerts } = useCryptoStore()
 
   useEffect(() => {
@@ -16,7 +17,16 @@ export default function AlertHistory() {
       setAlerts(alertService.getAlertHistory())
     })
 
-    return unsubscribe
+    // Close context menu on click outside
+    const handleClickOutside = () => {
+      setContextMenu(null)
+    }
+    document.addEventListener('click', handleClickOutside)
+
+    return () => {
+      unsubscribe()
+      document.removeEventListener('click', handleClickOutside)
+    }
   }, [])
 
   const formatTime = (timestamp: number) => {
@@ -87,6 +97,31 @@ export default function AlertHistory() {
     }
   }
 
+  const handleContextMenu = (e: React.MouseEvent, coinId: string, coinName: string) => {
+    e.preventDefault()
+    e.stopPropagation()
+    setContextMenu({
+      x: e.clientX,
+      y: e.clientY,
+      coinId,
+      coinName
+    })
+  }
+
+  const handleMuteCoin = () => {
+    if (contextMenu) {
+      alertService.muteCoin(contextMenu.coinId)
+      setContextMenu(null)
+    }
+  }
+
+  const handleUnmuteCoin = () => {
+    if (contextMenu) {
+      alertService.unmuteCoin(contextMenu.coinId)
+      setContextMenu(null)
+    }
+  }
+
   const getExchangeLink = (symbol: string, exchange: 'binance' | 'coinbase' | 'kraken') => {
     const symbolLower = symbol.toLowerCase()
     switch (exchange) {
@@ -122,7 +157,11 @@ export default function AlertHistory() {
 
       <div className="alerts-list">
         {alerts.map((alert) => (
-          <div key={alert.id} className={`alert-item ${alert.type}`}>
+          <div
+            key={alert.id}
+            className={`alert-item ${alert.type} ${alertService.isCoinMuted(alert.coinId) ? 'muted' : ''}`}
+            onContextMenu={(e) => handleContextMenu(e, alert.coinId, alert.coinName)}
+          >
             <div className="alert-icon">{getAlertIcon(alert.type)}</div>
 
             <div className="alert-content">
@@ -182,6 +221,30 @@ export default function AlertHistory() {
           </div>
         ))}
       </div>
+
+      {contextMenu && (
+        <div
+          className="context-menu"
+          style={{
+            position: 'fixed',
+            top: contextMenu.y,
+            left: contextMenu.x,
+            zIndex: 1000,
+          }}
+          onClick={(e) => e.stopPropagation()}
+        >
+          <div className="context-menu-header">{contextMenu.coinName}</div>
+          {alertService.isCoinMuted(contextMenu.coinId) ? (
+            <button className="context-menu-item" onClick={handleUnmuteCoin}>
+              🔔 Unmute Alerts
+            </button>
+          ) : (
+            <button className="context-menu-item" onClick={handleMuteCoin}>
+              🔕 Mute Alerts
+            </button>
+          )}
+        </div>
+      )}
     </div>
   )
 }

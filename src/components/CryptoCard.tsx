@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import type { CryptoData } from '../types/crypto'
 import { useCryptoStore } from '../stores/cryptoStore'
 
@@ -6,8 +7,9 @@ interface CryptoCardProps {
 }
 
 export default function CryptoCard({ crypto }: CryptoCardProps) {
-  const { setSelectedCoin, toggleFavorite, settings } = useCryptoStore()
+  const { setSelectedCoin, toggleFavorite, settings, addCoinToWatchlist, removeCoinFromWatchlist } = useCryptoStore()
   const isFavorite = settings.favoriteCoins.includes(crypto.id)
+  const [showWatchlistMenu, setShowWatchlistMenu] = useState(false)
 
   const priceChange = crypto.price_change_percentage_24h
   const isPositive = priceChange >= 0
@@ -47,6 +49,20 @@ export default function CryptoCard({ crypto }: CryptoCardProps) {
     return `$${marketCap.toFixed(2)}`
   }
 
+  const isInWatchlist = (watchlistId: string) => {
+    const watchlist = settings.watchlists.find(w => w.id === watchlistId)
+    return watchlist?.coinIds.includes(crypto.id) || false
+  }
+
+  const handleWatchlistToggle = (watchlistId: string, e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (isInWatchlist(watchlistId)) {
+      removeCoinFromWatchlist(watchlistId, crypto.id)
+    } else {
+      addCoinToWatchlist(watchlistId, crypto.id)
+    }
+  }
+
   return (
     <div
       className={`crypto-card ${isPositive ? 'positive' : 'negative'}`}
@@ -60,15 +76,51 @@ export default function CryptoCard({ crypto }: CryptoCardProps) {
             <span className="crypto-symbol">{crypto.symbol.toUpperCase()}</span>
           </div>
         </div>
-        <button
-          className={`favorite-btn ${isFavorite ? 'active' : ''}`}
-          onClick={(e) => {
-            e.stopPropagation()
-            toggleFavorite(crypto.id)
-          }}
-        >
-          {isFavorite ? '★' : '☆'}
-        </button>
+        <div className="crypto-actions">
+          <div className="watchlist-menu-container">
+            <button
+              className="watchlist-btn"
+              onClick={(e) => {
+                e.stopPropagation()
+                setShowWatchlistMenu(!showWatchlistMenu)
+              }}
+              title="Add to watchlist"
+            >
+              📋
+            </button>
+            {showWatchlistMenu && (
+              <div className="watchlist-dropdown" onClick={(e) => e.stopPropagation()}>
+                <div className="watchlist-dropdown-header">Add to Watchlist</div>
+                {settings.watchlists.length === 0 ? (
+                  <div className="watchlist-dropdown-empty">
+                    No watchlists yet. Create one first!
+                  </div>
+                ) : (
+                  settings.watchlists.map((watchlist) => (
+                    <div
+                      key={watchlist.id}
+                      className={`watchlist-dropdown-item ${isInWatchlist(watchlist.id) ? 'active' : ''}`}
+                      onClick={(e) => handleWatchlistToggle(watchlist.id, e)}
+                    >
+                      <span>{watchlist.name}</span>
+                      {isInWatchlist(watchlist.id) && <span className="checkmark">✓</span>}
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+          <button
+            className={`favorite-btn ${isFavorite ? 'active' : ''}`}
+            onClick={(e) => {
+              e.stopPropagation()
+              toggleFavorite(crypto.id)
+            }}
+            title="Add to favorites"
+          >
+            {isFavorite ? '★' : '☆'}
+          </button>
+        </div>
       </div>
 
       <div className="crypto-price">

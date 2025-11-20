@@ -38,6 +38,8 @@ interface CryptoStore {
   updateSettings: (settings: Partial<UserSettings>) => void
   addToWatchlist: (watchlist: Watchlist) => void
   removeFromWatchlist: (watchlistId: string) => void
+  addCoinToWatchlist: (watchlistId: string, coinId: string) => void
+  removeCoinFromWatchlist: (watchlistId: string, coinId: string) => void
   toggleFavorite: (coinId: string) => void
   clearAlerts: () => void
   calculateIndicators: (coinId: string) => void
@@ -118,9 +120,22 @@ export const useCryptoStore = create<CryptoStore>((set, get) => ({
     set((state) => {
       const cryptoList = state.cryptoList.map((coin) => {
         if (coin.id === coinId) {
-          const priceChange24h = price - coin.current_price
-          const priceChangePercentage24h =
-            ((price - coin.current_price) / coin.current_price) * 100
+          // Get price history to calculate accurate 24h change
+          const priceHistory = alertService.getPriceHistory(coinId)
+
+          // Calculate 24h percentage change if we have enough history
+          let priceChangePercentage24h = coin.price_change_percentage_24h
+          let priceChange24h = coin.price_change_24h
+
+          // Only recalculate if we have data from 24h ago (24h = 86400000ms)
+          const twentyFourHoursAgo = Date.now() - 86400000
+          const oldPrice = priceHistory.find(h => h.timestamp <= twentyFourHoursAgo)
+
+          if (oldPrice) {
+            priceChange24h = price - oldPrice.price
+            priceChangePercentage24h = ((price - oldPrice.price) / oldPrice.price) * 100
+          }
+          // Otherwise preserve the original API values
 
           const updatedCoin = {
             ...coin,
@@ -206,6 +221,42 @@ export const useCryptoStore = create<CryptoStore>((set, get) => ({
       settings: {
         ...state.settings,
         watchlists: state.settings.watchlists.filter((w) => w.id !== watchlistId),
+      },
+    }))
+
+    // Save to localStorage
+    const settings = get().settings
+    localStorage.setItem('cryptoSettings', JSON.stringify(settings))
+  },
+
+  // Add coin to watchlist
+  addCoinToWatchlist: (watchlistId: string, coinId: string) => {
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        watchlists: state.settings.watchlists.map((w) =>
+          w.id === watchlistId && !w.coinIds.includes(coinId)
+            ? { ...w, coinIds: [...w.coinIds, coinId], updatedAt: Date.now() }
+            : w
+        ),
+      },
+    }))
+
+    // Save to localStorage
+    const settings = get().settings
+    localStorage.setItem('cryptoSettings', JSON.stringify(settings))
+  },
+
+  // Remove coin from watchlist
+  removeCoinFromWatchlist: (watchlistId: string, coinId: string) => {
+    set((state) => ({
+      settings: {
+        ...state.settings,
+        watchlists: state.settings.watchlists.map((w) =>
+          w.id === watchlistId
+            ? { ...w, coinIds: w.coinIds.filter((id) => id !== coinId), updatedAt: Date.now() }
+            : w
+        ),
       },
     }))
 
