@@ -3,38 +3,20 @@ import './App.css'
 import Dashboard from './pages/Dashboard'
 import Watchlist from './pages/Watchlist'
 import CryptoSettings from './pages/CryptoSettings'
-import Auth from './pages/Auth'
 import AlertHistory from './components/AlertHistory'
 import TradeCalculator from './components/TradeCalculator'
-import { AuthProvider, useAuth } from './contexts/AuthContext'
 import { useCryptoStore } from './stores/cryptoStore'
 
 type Page = 'dashboard' | 'watchlist' | 'alerts' | 'calculator' | 'settings'
 
-function AppContent() {
+function App() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard')
-  const { user, loading, signOut } = useAuth()
   const { settings } = useCryptoStore()
 
   useEffect(() => {
     // Apply theme on mount
     document.documentElement.setAttribute('data-theme', settings.theme)
   }, [settings.theme])
-
-  if (loading) {
-    return (
-      <div className="app loading-screen">
-        <div className="loading-content">
-          <span className="loading-icon">₿</span>
-          <p>Loading Crypto Dashboard...</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!user) {
-    return <Auth />
-  }
 
   const renderPage = () => {
     switch (currentPage) {
@@ -101,28 +83,12 @@ function AppContent() {
             <span className="nav-icon">⚙️</span>
             Settings
           </button>
-          <button
-            className="nav-link logout"
-            onClick={signOut}
-            title="Logout"
-          >
-            <span className="nav-icon">🚪</span>
-            Logout
-          </button>
         </div>
       </nav>
       <main className="main-content">
         {renderPage()}
       </main>
     </div>
-  )
-}
-
-function App() {
-  return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
   )
 }
 
