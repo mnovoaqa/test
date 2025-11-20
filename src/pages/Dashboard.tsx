@@ -1,6 +1,7 @@
 import { useEffect, useState, useMemo } from 'react'
 import { useCryptoStore } from '../stores/cryptoStore'
 import CryptoCard from '../components/CryptoCard'
+import TopSignalsWidget from '../components/TopSignalsWidget'
 
 interface DashboardProps {
   onNavigateToChart?: (coinId: string) => void
@@ -186,15 +187,21 @@ export default function Dashboard({ onNavigateToChart }: DashboardProps) {
           <p>Loading cryptocurrency data...</p>
         </div>
       ) : (
-        <div className={`crypto-${viewMode}`}>
-          {filteredAndSortedList.map((crypto) => (
-            <CryptoCard
-              key={crypto.id}
-              crypto={crypto}
-              onNavigateToChart={onNavigateToChart}
-            />
-          ))}
-        </div>
+        <>
+          {/* Top AI Signals Widget */}
+          <TopSignalsWidget onNavigateToChart={onNavigateToChart} />
+
+          {/* Crypto Cards Grid */}
+          <div className={`crypto-${viewMode}`}>
+            {filteredAndSortedList.map((crypto) => (
+              <CryptoCard
+                key={crypto.id}
+                crypto={crypto}
+                onNavigateToChart={onNavigateToChart}
+              />
+            ))}
+          </div>
+        </>
       )}
 
       {filteredAndSortedList.length === 0 && !loading && (

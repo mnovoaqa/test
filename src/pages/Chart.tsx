@@ -1,6 +1,6 @@
-import { useState, useMemo, useEffect, useRef } from 'react'
-import { createChart } from 'lightweight-charts'
-import type { UTCTimestamp } from 'lightweight-charts'
+import { useState, useMemo } from 'react'
+import ReactApexChart from 'react-apexcharts'
+import type { ApexOptions } from 'apexcharts'
 import { useCryptoStore } from '../stores/cryptoStore'
 import { alertService } from '../services/alertService'
 import { TechnicalIndicatorsCalculator } from '../services/technicalIndicators'
@@ -39,16 +39,6 @@ export default function Chart({ initialCoinId }: ChartProps) {
   const [activeIndicators, setActiveIndicators] = useState<Set<IndicatorType>>(new Set(['volume']))
 
   const [indicatorStatus, setIndicatorStatus] = useState<string>('')
-  const [isChartReady, setIsChartReady] = useState(false)
-  const [isRsiChartReady, setIsRsiChartReady] = useState(false)
-
-  const chartContainerRef = useRef<HTMLDivElement>(null)
-  const chartRef = useRef<any>(null)
-  const seriesRefs = useRef<Map<string, any>>(new Map())
-
-  const rsiChartContainerRef = useRef<HTMLDivElement>(null)
-  const rsiChartRef = useRef<any>(null)
-  const rsiSeriesRef = useRef<any>(null)
 
   const toggleIndicator = (indicator: IndicatorType) => {
     setActiveIndicators(prev => {
@@ -146,383 +136,289 @@ export default function Chart({ initialCoinId }: ChartProps) {
 
   const hasData = chartData.length > 0
 
-  // Initialize main chart
-  useEffect(() => {
-    if (!chartContainerRef.current || !hasData) {
-      setIsChartReady(false)
-      return
-    }
+  // Prepare ApexCharts data
+  const mainChartSeries = useMemo(() => {
+    if (!hasData) return []
 
-    let isMounted = true
+    const series: any[] = []
 
-    // Use requestAnimationFrame to ensure DOM is fully ready
-    const initializeChart = () => {
-      requestAnimationFrame(() => {
-        if (!chartContainerRef.current || !isMounted) return
-
-        try {
-          // Create chart
-          const chart = createChart(chartContainerRef.current, {
-            width: chartContainerRef.current.clientWidth,
-            height: 500,
-            layout: {
-              background: { color: 'transparent' },
-              textColor: '#6b7280',
-            },
-            grid: {
-              vertLines: { color: '#374151' },
-              horzLines: { color: '#374151' },
-            },
-            crosshair: {
-              mode: 1,
-            },
-            rightPriceScale: {
-              borderColor: '#374151',
-            },
-            timeScale: {
-              borderColor: '#374151',
-              timeVisible: true,
-              secondsVisible: false,
-            },
-          })
-
-          chartRef.current = chart
-
-          // Mark chart as ready after a small delay to ensure full initialization
-          setTimeout(() => {
-            if (isMounted) {
-              setIsChartReady(true)
-            }
-          }, 50)
-        } catch (error) {
-          console.error('Error initializing chart:', error)
-        }
-      })
-    }
-
-    initializeChart()
-
-    // Handle resize
-    const handleResize = () => {
-      if (chartContainerRef.current && chartRef.current) {
-        chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth })
-      }
-    }
-
-    window.addEventListener('resize', handleResize)
-
-    return () => {
-      isMounted = false
-      window.removeEventListener('resize', handleResize)
-      setIsChartReady(false)
-      if (chartRef.current) {
-        try {
-          chartRef.current.remove()
-        } catch (error) {
-          console.warn('Error removing chart:', error)
-        }
-      }
-      chartRef.current = null
-      seriesRefs.current.clear()
-    }
-  }, [hasData])
-
-  // Initialize RSI chart
-  useEffect(() => {
-    if (!rsiChartContainerRef.current || !hasData || !activeIndicators.has('rsi')) {
-      setIsRsiChartReady(false)
-      return
-    }
-
-    let isMounted = true
-
-    // Use requestAnimationFrame to ensure DOM is fully ready
-    const initializeRsiChart = () => {
-      requestAnimationFrame(() => {
-        if (!rsiChartContainerRef.current || !isMounted) return
-
-        try {
-          // Create RSI chart
-          const rsiChart = createChart(rsiChartContainerRef.current, {
-            width: rsiChartContainerRef.current.clientWidth,
-            height: 150,
-            layout: {
-              background: { color: 'transparent' },
-              textColor: '#6b7280',
-            },
-            grid: {
-              vertLines: { color: '#374151' },
-              horzLines: { color: '#374151' },
-            },
-            rightPriceScale: {
-              borderColor: '#374151',
-            },
-            timeScale: {
-              borderColor: '#374151',
-              timeVisible: true,
-              secondsVisible: false,
-            },
-          })
-
-          rsiChartRef.current = rsiChart
-
-          // Mark RSI chart as ready after a small delay to ensure full initialization
-          setTimeout(() => {
-            if (isMounted) {
-              setIsRsiChartReady(true)
-            }
-          }, 50)
-        } catch (error) {
-          console.error('Error initializing RSI chart:', error)
-        }
-      })
-    }
-
-    initializeRsiChart()
-
-    // Handle resize
-    const handleResize = () => {
-      if (rsiChartContainerRef.current && rsiChartRef.current) {
-        rsiChartRef.current.applyOptions({ width: rsiChartContainerRef.current.clientWidth })
-      }
-    }
-
-    window.addEventListener('resize', handleResize)
-
-    return () => {
-      isMounted = false
-      window.removeEventListener('resize', handleResize)
-      setIsRsiChartReady(false)
-      if (rsiChartRef.current) {
-        try {
-          rsiChartRef.current.remove()
-        } catch (error) {
-          console.warn('Error removing RSI chart:', error)
-        }
-      }
-      rsiChartRef.current = null
-      rsiSeriesRef.current = null
-    }
-  }, [hasData, activeIndicators])
-
-  // Update chart data
-  useEffect(() => {
-    // Wait for chart to be fully initialized before adding data
-    if (!chartRef.current || !hasData || !isChartReady) return
-
-    // Safety check: ensure chart methods exist
-    if (typeof chartRef.current.addCandlestickSeries !== 'function') {
-      console.error('Chart API methods not available. Chart may not be properly initialized.')
-      return
-    }
-
-    try {
-      // Clear existing series
-      seriesRefs.current.forEach(series => {
-        try {
-          chartRef.current.removeSeries(series)
-        } catch (error) {
-          console.warn('Error removing series:', error)
-        }
-      })
-      seriesRefs.current.clear()
-    } catch (error) {
-      console.error('Error clearing chart series:', error)
-      return
-    }
-
-    // Add volume first (so it's in the background)
-    if (activeIndicators.has('volume')) {
-      try {
-        const volumeSeries = chartRef.current.addHistogramSeries({
-          color: '#26a69a',
-          priceFormat: {
-            type: 'volume',
-          },
-          priceScaleId: 'volume',
-        })
-        volumeSeries.priceScale().applyOptions({
-          scaleMargins: {
-            top: 0.8,
-            bottom: 0,
-          },
-        })
-        const volumeData = chartData.map(d => ({
-          time: d.time as UTCTimestamp,
-          value: d.volume,
-          color: d.close >= d.open ? '#26a69a80' : '#ef535080',
-        }))
-        volumeSeries.setData(volumeData)
-        seriesRefs.current.set('volume', volumeSeries)
-      } catch (error) {
-        console.error('Error adding volume series:', error)
-      }
-    }
-
-    // Add main price series (candlestick or line)
+    // Main price series (candlestick or line)
     if (chartType === 'candlestick') {
-      const candlestickSeries = chartRef.current.addCandlestickSeries({
-        upColor: '#26a69a',
-        downColor: '#ef5350',
-        borderUpColor: '#26a69a',
-        borderDownColor: '#ef5350',
-        wickUpColor: '#26a69a',
-        wickDownColor: '#ef5350',
+      series.push({
+        name: 'Price',
+        type: 'candlestick',
+        data: chartData.map(d => ({
+          x: d.time * 1000,
+          y: [d.open, d.high, d.low, d.close]
+        }))
       })
-      const candleData = chartData.map(d => ({
-        time: d.time as UTCTimestamp,
-        open: d.open,
-        high: d.high,
-        low: d.low,
-        close: d.close,
-      }))
-      candlestickSeries.setData(candleData)
-      seriesRefs.current.set('candlestick', candlestickSeries)
     } else {
-      const lineSeries = chartRef.current.addLineSeries({
-        color: '#2196F3',
-        lineWidth: 2,
+      series.push({
+        name: 'Price',
+        type: 'line',
+        data: chartData.map(d => ({
+          x: d.time * 1000,
+          y: d.close
+        }))
       })
-      const lineData = chartData.map(d => ({
-        time: d.time as UTCTimestamp,
-        value: d.close,
-      }))
-      lineSeries.setData(lineData)
-      seriesRefs.current.set('line', lineSeries)
     }
 
     // Add SMA
     if (activeIndicators.has('sma')) {
-      const smaSeries = chartRef.current.addLineSeries({
-        color: '#2196F3',
-        lineWidth: 2,
-        title: 'SMA(20)',
+      series.push({
+        name: 'SMA(20)',
+        type: 'line',
+        data: chartData
+          .filter(d => d.sma !== undefined)
+          .map(d => ({
+            x: d.time * 1000,
+            y: d.sma
+          }))
       })
-      const smaData = chartData
-        .filter(d => d.sma !== undefined)
-        .map(d => ({
-          time: d.time as UTCTimestamp,
-          value: d.sma!,
-        }))
-      smaSeries.setData(smaData)
-      seriesRefs.current.set('sma', smaSeries)
     }
 
     // Add EMA
     if (activeIndicators.has('ema')) {
-      const emaSeries = chartRef.current.addLineSeries({
-        color: '#FF6B35',
-        lineWidth: 2,
-        title: 'EMA(12)',
+      series.push({
+        name: 'EMA(12)',
+        type: 'line',
+        data: chartData
+          .filter(d => d.ema !== undefined)
+          .map(d => ({
+            x: d.time * 1000,
+            y: d.ema
+          }))
       })
-      const emaData = chartData
-        .filter(d => d.ema !== undefined)
-        .map(d => ({
-          time: d.time as UTCTimestamp,
-          value: d.ema!,
-        }))
-      emaSeries.setData(emaData)
-      seriesRefs.current.set('ema', emaSeries)
     }
 
     // Add Bollinger Bands
     if (activeIndicators.has('bollinger')) {
-      const bbUpperSeries = chartRef.current.addLineSeries({
-        color: '#9C27B0',
-        lineWidth: 1,
-        lineStyle: 2, // dashed
-        title: 'BB Upper',
+      series.push({
+        name: 'BB Upper',
+        type: 'line',
+        data: chartData
+          .filter(d => d.bbUpper !== undefined)
+          .map(d => ({
+            x: d.time * 1000,
+            y: d.bbUpper
+          }))
       })
-      const bbMiddleSeries = chartRef.current.addLineSeries({
-        color: '#9C27B0',
-        lineWidth: 1,
-        title: 'BB Middle',
+      series.push({
+        name: 'BB Middle',
+        type: 'line',
+        data: chartData
+          .filter(d => d.bbMiddle !== undefined)
+          .map(d => ({
+            x: d.time * 1000,
+            y: d.bbMiddle
+          }))
       })
-      const bbLowerSeries = chartRef.current.addLineSeries({
-        color: '#9C27B0',
-        lineWidth: 1,
-        lineStyle: 2, // dashed
-        title: 'BB Lower',
+      series.push({
+        name: 'BB Lower',
+        type: 'line',
+        data: chartData
+          .filter(d => d.bbLower !== undefined)
+          .map(d => ({
+            x: d.time * 1000,
+            y: d.bbLower
+          }))
       })
-
-      const bbUpperData = chartData
-        .filter(d => d.bbUpper !== undefined)
-        .map(d => ({
-          time: d.time as UTCTimestamp,
-          value: d.bbUpper!,
-        }))
-      const bbMiddleData = chartData
-        .filter(d => d.bbMiddle !== undefined)
-        .map(d => ({
-          time: d.time as UTCTimestamp,
-          value: d.bbMiddle!,
-        }))
-      const bbLowerData = chartData
-        .filter(d => d.bbLower !== undefined)
-        .map(d => ({
-          time: d.time as UTCTimestamp,
-          value: d.bbLower!,
-        }))
-
-      bbUpperSeries.setData(bbUpperData)
-      bbMiddleSeries.setData(bbMiddleData)
-      bbLowerSeries.setData(bbLowerData)
-
-      seriesRefs.current.set('bbUpper', bbUpperSeries)
-      seriesRefs.current.set('bbMiddle', bbMiddleSeries)
-      seriesRefs.current.set('bbLower', bbLowerSeries)
     }
 
-    // Fit content
-    chartRef.current.timeScale().fitContent()
+    // Add Volume
+    if (activeIndicators.has('volume')) {
+      series.push({
+        name: 'Volume',
+        type: 'bar',
+        data: chartData.map(d => ({
+          x: d.time * 1000,
+          y: d.volume
+        }))
+      })
+    }
 
-  }, [chartData, chartType, activeIndicators, hasData, isChartReady])
+    return series
+  }, [chartData, chartType, activeIndicators, hasData])
 
-  // Update RSI chart data
-  useEffect(() => {
-    // Wait for RSI chart to be fully initialized before adding data
-    if (!rsiChartRef.current || !hasData || !activeIndicators.has('rsi') || !isRsiChartReady) return
-
-    // Clear existing RSI series
-    if (rsiSeriesRef.current) {
-      try {
-        rsiChartRef.current.removeSeries(rsiSeriesRef.current)
-        rsiSeriesRef.current = null
-      } catch (error) {
-        console.warn('Error removing RSI series:', error)
+  const mainChartOptions: ApexOptions = useMemo(() => ({
+    chart: {
+      type: 'candlestick',
+      height: 500,
+      background: 'transparent',
+      toolbar: {
+        show: true,
+        tools: {
+          download: true,
+          zoom: true,
+          zoomin: true,
+          zoomout: true,
+          pan: true,
+          reset: true
+        }
+      },
+      animations: {
+        enabled: false
+      }
+    },
+    theme: {
+      mode: 'dark'
+    },
+    xaxis: {
+      type: 'datetime',
+      labels: {
+        style: {
+          colors: '#6b7280'
+        }
+      }
+    },
+    yaxis: [
+      {
+        seriesName: 'Price',
+        labels: {
+          style: {
+            colors: '#6b7280'
+          },
+          formatter: (val: number) => `$${val.toFixed(2)}`
+        },
+        tooltip: {
+          enabled: true
+        }
+      },
+      ...(activeIndicators.has('volume') ? [{
+        seriesName: 'Volume',
+        opposite: true,
+        labels: {
+          style: {
+            colors: '#6b7280'
+          },
+          formatter: (val: number) => {
+            if (val >= 1e9) return `$${(val / 1e9).toFixed(2)}B`
+            if (val >= 1e6) return `$${(val / 1e6).toFixed(2)}M`
+            if (val >= 1e3) return `$${(val / 1e3).toFixed(2)}K`
+            return `$${val.toFixed(2)}`
+          }
+        },
+        max: Math.max(...chartData.map(d => d.volume)) * 3
+      }] : [])
+    ],
+    grid: {
+      borderColor: '#374151'
+    },
+    tooltip: {
+      theme: 'dark',
+      x: {
+        format: 'dd MMM yyyy HH:mm'
+      }
+    },
+    plotOptions: {
+      candlestick: {
+        colors: {
+          upward: '#10b981',
+          downward: '#ef4444'
+        }
+      },
+      bar: {
+        columnWidth: '80%'
+      }
+    },
+    colors: ['#2196F3', '#FF6B35', '#9C27B0', '#9C27B0', '#9C27B0', '#26a69a80'],
+    stroke: {
+      width: [1, 2, 2, 1, 1, 1, 0]
+    },
+    legend: {
+      show: true,
+      position: 'top',
+      labels: {
+        colors: '#9ca3af'
       }
     }
+  }), [chartData, activeIndicators])
 
-    // Add RSI line
-    try {
-      const rsiSeries = rsiChartRef.current.addLineSeries({
-        color: '#2962FF',
-        lineWidth: 2,
-        title: 'RSI(14)',
-      })
+  // RSI Chart
+  const rsiChartSeries = useMemo(() => {
+    if (!hasData || !activeIndicators.has('rsi')) return []
 
-      const rsiData = chartData
+    return [{
+      name: 'RSI(14)',
+      data: chartData
         .filter(d => d.rsi !== undefined)
         .map(d => ({
-          time: d.time as UTCTimestamp,
-          value: d.rsi!,
+          x: d.time * 1000,
+          y: d.rsi
         }))
+    }]
+  }, [chartData, hasData, activeIndicators])
 
-      rsiSeries.setData(rsiData)
-      rsiSeriesRef.current = rsiSeries
-
-      // Set price scale options for RSI (0-100 range)
-      rsiSeries.priceScale().applyOptions({
-        autoScale: false,
-      })
-
-      // Fit content
-      rsiChartRef.current.timeScale().fitContent()
-    } catch (error) {
-      console.error('Error updating RSI chart:', error)
+  const rsiChartOptions: ApexOptions = useMemo(() => ({
+    chart: {
+      type: 'line',
+      height: 150,
+      background: 'transparent',
+      toolbar: {
+        show: false
+      },
+      animations: {
+        enabled: false
+      }
+    },
+    theme: {
+      mode: 'dark'
+    },
+    xaxis: {
+      type: 'datetime',
+      labels: {
+        show: false
+      }
+    },
+    yaxis: {
+      min: 0,
+      max: 100,
+      labels: {
+        style: {
+          colors: '#6b7280'
+        }
+      }
+    },
+    grid: {
+      borderColor: '#374151'
+    },
+    stroke: {
+      width: 2,
+      colors: ['#2962FF']
+    },
+    annotations: {
+      yaxis: [
+        {
+          y: 70,
+          borderColor: '#ef4444',
+          strokeDashArray: 4,
+          label: {
+            text: 'Overbought',
+            style: {
+              color: '#ef4444'
+            }
+          }
+        },
+        {
+          y: 30,
+          borderColor: '#10b981',
+          strokeDashArray: 4,
+          label: {
+            text: 'Oversold',
+            style: {
+              color: '#10b981'
+            }
+          }
+        }
+      ]
+    },
+    tooltip: {
+      theme: 'dark',
+      x: {
+        format: 'dd MMM yyyy HH:mm'
+      }
     }
-
-  }, [chartData, hasData, activeIndicators, isRsiChartReady])
+  }), [])
 
   return (
     <div className="chart-page">
@@ -655,14 +551,24 @@ export default function Chart({ initialCoinId }: ChartProps) {
         ) : (
           <>
             <div className="chart-container">
-              <div ref={chartContainerRef} className="lightweight-chart" />
+              <ReactApexChart
+                options={mainChartOptions}
+                series={mainChartSeries}
+                type="candlestick"
+                height={500}
+              />
             </div>
 
             {/* RSI Chart */}
             {activeIndicators.has('rsi') && (
               <div className="rsi-container">
                 <div className="rsi-label">RSI (14)</div>
-                <div ref={rsiChartContainerRef} className="lightweight-chart" />
+                <ReactApexChart
+                  options={rsiChartOptions}
+                  series={rsiChartSeries}
+                  type="line"
+                  height={150}
+                />
               </div>
             )}
           </>

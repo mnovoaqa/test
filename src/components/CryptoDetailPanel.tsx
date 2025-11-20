@@ -1,6 +1,9 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import type { CryptoData, EnhancedCryptoData } from '../types/crypto'
 import { enhancedCryptoService } from '../services/enhancedCryptoService'
+import { alertService } from '../services/alertService'
+import ReactApexChart from 'react-apexcharts'
+import type { ApexOptions } from 'apexcharts'
 import './CryptoDetailPanel.css'
 
 interface CryptoDetailPanelProps {
@@ -53,6 +56,96 @@ export default function CryptoDetailPanel({ crypto }: CryptoDetailPanelProps) {
   const sentimentIndicator = enhancedCryptoService.getSentimentIndicator(enhancedData.sentiment)
   const athInfo = enhancedCryptoService.formatATHDistance(crypto.current_price, crypto.ath)
   const predictiveSummary = enhancedCryptoService.getPredictiveSignalSummary(enhancedData.predictiveSignals)
+
+  // Generate price prediction trend
+  const predictionData = useMemo(() => {
+    const priceHistory = alertService.getPriceHistory(crypto.id)
+    if (priceHistory.length < 20) return null
+
+    const recentPrices = priceHistory.slice(-20).map(p => p.price)
+    const currentPrice = recentPrices[recentPrices.length - 1]
+
+    // Calculate trend using simple moving average
+    const sma = recentPrices.reduce((a, b) => a + b, 0) / recentPrices.length
+    const trend = currentPrice > sma ? 'up' : 'down'
+    const changePercent = ((currentPrice - sma) / sma) * 100
+
+    // Simple prediction: extend trend with decreasing confidence
+    const predictions = []
+    let predictedPrice = currentPrice
+    const trendMultiplier = trend === 'up' ? 1.002 : 0.998
+
+    for (let i = 1; i <= 7; i++) {
+      predictedPrice = predictedPrice * trendMultiplier
+      const confidence = Math.max(30, 85 - (i * 8)) // Decreasing confidence
+      predictions.push({
+        day: i,
+        price: predictedPrice,
+        confidence
+      })
+    }
+
+    return {
+      currentPrice,
+      sma,
+      trend,
+      changePercent,
+      predictions
+    }
+  }, [crypto.id])
+
+  const predictionChartOptions: ApexOptions = useMemo(() => ({
+    chart: {
+      type: 'line',
+      height: 200,
+      background: 'transparent',
+      toolbar: { show: false },
+      animations: { enabled: false }
+    },
+    theme: { mode: 'dark' },
+    xaxis: {
+      categories: predictionData?.predictions.map(p => `Day ${p.day}`) || [],
+      labels: { style: { colors: '#6b7280' } }
+    },
+    yaxis: {
+      labels: {
+        style: { colors: '#6b7280' },
+        formatter: (val: number) => `$${val.toFixed(2)}`
+      }
+    },
+    stroke: {
+      curve: 'smooth',
+      width: 3,
+      dashArray: [0, 5]
+    },
+    colors: ['#667eea', '#f59e0b'],
+    grid: { borderColor: '#374151' },
+    tooltip: {
+      theme: 'dark',
+      y: {
+        formatter: (val: number) => `$${val.toFixed(2)}`
+      }
+    },
+    legend: {
+      show: true,
+      labels: { colors: '#9ca3af' }
+    }
+  }), [predictionData])
+
+  const predictionChartSeries = useMemo(() => {
+    if (!predictionData) return []
+
+    return [
+      {
+        name: 'Current Price',
+        data: [predictionData.currentPrice, ...predictionData.predictions.map(() => null)]
+      },
+      {
+        name: 'Predicted',
+        data: [predictionData.currentPrice, ...predictionData.predictions.map(p => p.price)]
+      }
+    ]
+  }, [predictionData])
 
   return (
     <div className="crypto-detail-panel">
@@ -125,6 +218,42 @@ export default function CryptoDetailPanel({ crypto }: CryptoDetailPanelProps) {
                 </div>
               </div>
             ))}
+          </div>
+        </div>
+      )}
+
+      {/* AI Price Prediction */}
+      {predictionData && (
+        <div className="detail-section prediction-section">
+          <h4>📊 7-Day Price Prediction</h4>
+          <div className="prediction-summary">
+            <div className="prediction-stat">
+              <span className="stat-label">Current:</span>
+              <span className="stat-value">${predictionData.currentPrice.toFixed(2)}</span>
+            </div>
+            <div className="prediction-stat">
+              <span className="stat-label">7-Day Target:</span>
+              <span className={`stat-value ${predictionData.trend === 'up' ? 'positive' : 'negative'}`}>
+                ${predictionData.predictions[6].price.toFixed(2)}
+              </span>
+            </div>
+            <div className="prediction-stat">
+              <span className="stat-label">Trend:</span>
+              <span className={`stat-value ${predictionData.trend === 'up' ? 'positive' : 'negative'}`}>
+                {predictionData.trend === 'up' ? '📈 Bullish' : '📉 Bearish'}
+              </span>
+            </div>
+          </div>
+          <div className="prediction-chart">
+            <ReactApexChart
+              options={predictionChartOptions}
+              series={predictionChartSeries}
+              type="line"
+              height={200}
+            />
+          </div>
+          <div className="prediction-disclaimer">
+            ⚠️ Predictions based on recent price trends. Confidence decreases over time.
           </div>
         </div>
       )}

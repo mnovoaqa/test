@@ -68,12 +68,15 @@ class NewsService {
   private async fetchFromMultipleSources(coinSymbol: string): Promise<Omit<NewsArticle, 'coinId' | 'coinSymbol' | 'sentiment' | 'sentimentScore' | 'relevanceScore'>[]> {
     const articles: Omit<NewsArticle, 'coinId' | 'coinSymbol' | 'sentiment' | 'sentimentScore' | 'relevanceScore'>[] = []
 
-    // Source 1: CryptoPanic API (free, crypto-specific)
+    // Source 1: CryptoCompare API (real-time news)
     try {
-      const cryptoPanicArticles = await this.fetchFromCryptoPanic(coinSymbol)
-      articles.push(...cryptoPanicArticles)
+      const cryptoCompareArticles = await this.fetchFromCryptoPanic(coinSymbol)
+      if (cryptoCompareArticles.length > 0) {
+        articles.push(...cryptoCompareArticles)
+        console.log(`Fetched ${cryptoCompareArticles.length} real articles for ${coinSymbol}`)
+      }
     } catch (error) {
-      console.warn('CryptoPanic fetch failed:', error)
+      console.warn('CryptoCompare fetch failed:', error)
     }
 
     // Source 2: CoinGecko news (if available)
@@ -84,8 +87,9 @@ class NewsService {
       console.warn('CoinGecko news fetch failed:', error)
     }
 
-    // Source 3: Mock aggregated crypto news for demo
+    // Fallback: Use realistic mock news if no real articles found
     if (articles.length === 0) {
+      console.log(`Using mock news for ${coinSymbol} (no real articles available)`)
       articles.push(...this.getMockNews(coinSymbol))
     }
 
@@ -94,17 +98,43 @@ class NewsService {
 
   /**
    * Fetch from CryptoPanic API
-   * Note: Direct browser calls are blocked by CORS. This would need a backend proxy.
+   * Note: Using CryptoCompare instead as it supports CORS
    */
-  private async fetchFromCryptoPanic(_coinSymbol: string): Promise<Omit<NewsArticle, 'coinId' | 'coinSymbol' | 'sentiment' | 'sentimentScore' | 'relevanceScore'>[]> {
-    // CORS blocks direct API calls from browser
-    // To enable this, you would need to:
-    // 1. Set up a backend proxy server
-    // 2. Get a CryptoPanic API key
-    // 3. Make requests through your backend
+  private async fetchFromCryptoPanic(coinSymbol: string): Promise<Omit<NewsArticle, 'coinId' | 'coinSymbol' | 'sentiment' | 'sentimentScore' | 'relevanceScore'>[]> {
+    try {
+      // CryptoCompare News API - Supports CORS, no auth required for basic use
+      const response = await fetch(
+        `https://min-api.cryptocompare.com/data/v2/news/?lang=EN&categories=${coinSymbol.toUpperCase()}`,
+        {
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      )
 
-    // For now, returning empty array to use mock data instead
-    return []
+      if (!response.ok) {
+        console.warn(`CryptoCompare API returned ${response.status}`)
+        return []
+      }
+
+      const data = await response.json()
+
+      if (!data.Data || !Array.isArray(data.Data)) {
+        return []
+      }
+
+      return data.Data.slice(0, 10).map((article: any) => ({
+        id: article.id || `news-${Date.now()}-${Math.random()}`,
+        title: article.title || 'Untitled',
+        description: article.body || article.title || '',
+        url: article.url || article.guid || '#',
+        source: article.source_info?.name || article.source || 'CryptoCompare',
+        publishedAt: new Date(article.published_on * 1000).toISOString()
+      }))
+    } catch (error) {
+      console.warn('CryptoCompare fetch failed:', error)
+      return []
+    }
   }
 
   /**

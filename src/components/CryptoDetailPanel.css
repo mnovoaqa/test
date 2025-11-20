@@ -355,3 +355,60 @@
     gap: 10px;
   }
 }
+
+/* Prediction Section */
+.prediction-section {
+  background: linear-gradient(135deg, rgba(102, 126, 234, 0.1) 0%, rgba(118, 75, 162, 0.1) 100%);
+}
+
+.prediction-summary {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.prediction-stat {
+  flex: 1;
+  min-width: 120px;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.prediction-stat .stat-label {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+  text-transform: uppercase;
+  font-weight: 600;
+  letter-spacing: 0.5px;
+}
+
+.prediction-stat .stat-value {
+  font-size: 1.1rem;
+  color: var(--text-primary);
+  font-weight: 700;
+}
+
+.prediction-stat .stat-value.positive {
+  color: #10b981;
+}
+
+.prediction-stat .stat-value.negative {
+  color: #ef4444;
+}
+
+.prediction-chart {
+  margin: 1rem 0;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  padding: 0.5rem;
+}
+
+.prediction-disclaimer {
+  font-size: 0.7rem;
+  color: var(--text-tertiary);
+  font-style: italic;
+  text-align: center;
+  margin-top: 0.5rem;
+}
