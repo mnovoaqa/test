@@ -19,6 +19,8 @@ export default function Chart() {
   const chartRef = useRef<IChartApi | null>(null)
   const rsiContainerRef = useRef<HTMLDivElement>(null)
   const rsiChartRef = useRef<IChartApi | null>(null)
+  const seriesRefs = useRef<any[]>([])
+  const rsiSeriesRefs = useRef<any[]>([])
 
   // Initialize main chart
   useEffect(() => {
@@ -138,8 +140,12 @@ export default function Chart() {
     if (candleData.length === 0) return
 
     // Clear all series
-    // @ts-ignore - lightweight-charts type issue
-    chartRef.current.removeAllSeries()
+    seriesRefs.current.forEach(series => {
+      if (chartRef.current) {
+        chartRef.current.removeSeries(series)
+      }
+    })
+    seriesRefs.current = []
 
     // Add candlestick series
     // @ts-ignore - lightweight-charts type issue
@@ -160,6 +166,7 @@ export default function Chart() {
     }))
 
     candlestickSeries.setData(mappedCandles)
+    seriesRefs.current.push(candlestickSeries)
 
     // Add volume if enabled
     if (activeIndicators.has('volume')) {
@@ -187,6 +194,7 @@ export default function Chart() {
       }))
 
       volumeSeries.setData(volumeData)
+      seriesRefs.current.push(volumeSeries)
     }
 
     // Calculate and display SMA if enabled
@@ -208,6 +216,7 @@ export default function Chart() {
         }))
 
         smaSeries.setData(smaData)
+        seriesRefs.current.push(smaSeries)
       }
     }
 
@@ -230,6 +239,7 @@ export default function Chart() {
         }))
 
         emaSeries.setData(emaData)
+        seriesRefs.current.push(emaSeries)
       }
     }
 
@@ -282,14 +292,20 @@ export default function Chart() {
             value,
           }))
         )
+
+        seriesRefs.current.push(bollingerUpperSeries, bollingerMiddleSeries, bollingerLowerSeries)
       }
     }
 
     // Calculate and display RSI if enabled
     if (activeIndicators.has('rsi') && rsiChartRef.current) {
       // Clear RSI chart series
-      // @ts-ignore - lightweight-charts type issue
-      rsiChartRef.current.removeAllSeries()
+      rsiSeriesRefs.current.forEach(series => {
+        if (rsiChartRef.current) {
+          rsiChartRef.current.removeSeries(series)
+        }
+      })
+      rsiSeriesRefs.current = []
 
       const prices = candleData.map(c => c.close)
 
@@ -340,6 +356,7 @@ export default function Chart() {
 
       if (rsiData.length > 0) {
         rsiSeries.setData(rsiData)
+        rsiSeriesRefs.current.push(rsiSeries)
       }
     }
 
