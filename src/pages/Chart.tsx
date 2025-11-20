@@ -44,7 +44,7 @@ export default function Chart({ initialCoinId }: ChartProps) {
   const { cryptoList } = useCryptoStore()
   const [selectedCoin, setSelectedCoin] = useState<string>(initialCoinId || 'bitcoin')
   const [searchQuery, setSearchQuery] = useState<string>('')
-  const [timeframe, setTimeframe] = useState<Timeframe>('30d')
+  const [timeframe, setTimeframe] = useState<Timeframe>('1d')
   const [chartType, setChartType] = useState<ChartType>('candlestick')
   const [activeIndicators, setActiveIndicators] = useState<Set<IndicatorType>>(new Set(['volume']))
 

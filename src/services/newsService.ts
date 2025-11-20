@@ -136,22 +136,26 @@ class NewsService {
       {
         title: `${_coinSymbol} shows strong momentum amid institutional interest`,
         description: 'Major institutions continue to accumulate positions, driving positive sentiment in the market.',
-        source: 'Crypto News'
+        source: 'Crypto News',
+        searchQuery: `${_coinSymbol} cryptocurrency institutional interest news`
       },
       {
         title: `Technical analysis: ${_coinSymbol} approaching key resistance level`,
         description: 'Analysts are watching closely as the cryptocurrency nears a critical price point that could signal a breakout.',
-        source: 'Trading View'
+        source: 'Trading View',
+        searchQuery: `${_coinSymbol} technical analysis price prediction`
       },
       {
         title: `${_coinSymbol} network upgrade scheduled for next month`,
         description: 'Developers announce upcoming improvements that could enhance scalability and transaction speeds.',
-        source: 'Coin Telegraph'
+        source: 'Coin Telegraph',
+        searchQuery: `${_coinSymbol} network upgrade development news`
       },
       {
         title: `Market volatility: ${_coinSymbol} experiences increased trading volume`,
         description: 'Trading activity surges as market participants react to recent macroeconomic developments.',
-        source: 'Crypto Briefing'
+        source: 'Crypto Briefing',
+        searchQuery: `${_coinSymbol} trading volume market analysis`
       }
     ]
 
@@ -159,7 +163,7 @@ class NewsService {
       id: `mock-${_coinSymbol}-${index}`,
       title: template.title,
       description: template.description,
-      url: `https://example.com/news/${_coinSymbol.toLowerCase()}-${index}`,
+      url: `https://www.google.com/search?q=${encodeURIComponent(template.searchQuery)}`,
       source: template.source,
       publishedAt: new Date(Date.now() - index * 3600000).toISOString() // Stagger by hours
     }))

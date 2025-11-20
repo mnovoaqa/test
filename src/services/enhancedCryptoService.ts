@@ -23,7 +23,27 @@ class EnhancedCryptoService {
     'chainlink': 'https://chain.link/whitepaper',
     'polygon': 'https://polygon.technology/lightpaper-polygon.pdf',
     'uniswap': 'https://uniswap.org/whitepaper-v3.pdf',
-    'aave': 'https://github.com/aave/protocol-v2/blob/master/aave-v2-whitepaper.pdf'
+    'aave': 'https://github.com/aave/protocol-v2/blob/master/aave-v2-whitepaper.pdf',
+    'ripple': 'https://ripple.com/files/ripple_consensus_whitepaper.pdf',
+    'litecoin': 'https://whitepaper.io/document/683/litecoin-whitepaper',
+    'stellar': 'https://www.stellar.org/papers/stellar-consensus-protocol',
+    'algorand': 'https://www.algorand.com/resources/white-papers',
+    'cosmos': 'https://v1.cosmos.network/resources/whitepaper',
+    'tron': 'https://tron.network/static/doc/white_paper_v_2_0.pdf',
+    'tezos': 'https://tezos.com/whitepaper.pdf',
+    'vechain': 'https://www.vechain.org/whitepaper/',
+    'theta-token': 'https://www.thetatoken.org/theta-whitepaper',
+    'filecoin': 'https://filecoin.io/filecoin.pdf',
+    'monero': 'https://www.getmonero.org/library/Zero-to-Monero-2-0-0.pdf',
+    'eos': 'https://github.com/EOSIO/Documentation/blob/master/TechnicalWhitePaper.md',
+    'near': 'https://near.org/papers/the-official-near-white-paper',
+    'fantom': 'https://fantom.foundation/fantom_whitepaper.pdf',
+    'hedera-hashgraph': 'https://hedera.com/hh_whitepaper_v2.1-20200815.pdf',
+    'internet-computer': 'https://dfinity.org/whitepaper.pdf',
+    'aptos': 'https://aptos.dev/aptos-white-paper/aptos-white-paper-index',
+    'sui': 'https://docs.sui.io/paper/sui.pdf',
+    'arbitrum': 'https://github.com/OffchainLabs/nitro/blob/master/docs/Nitro-whitepaper.pdf',
+    'optimism': 'https://github.com/ethereum-optimism/optimistic-specs/blob/main/README.md'
   }
 
   /**
