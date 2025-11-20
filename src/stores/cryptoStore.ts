@@ -12,6 +12,7 @@ import { cryptoPricePoller } from '../services/cryptoPricePoller'
 import { alertService } from '../services/alertService'
 import { notificationService } from '../services/notificationService'
 import { TechnicalIndicatorsCalculator } from '../services/technicalIndicators'
+import { baselineTracker } from '../services/baselineTracker'
 
 interface CryptoStore {
   // Data
@@ -91,22 +92,30 @@ export const useCryptoStore = create<CryptoStore>((set, get) => ({
           get().updateCryptoPrice(coin.id, priceData.price, priceData.volume)
         })
 
-        // Add initial price data to alert service
+        // Add initial price data to alert service (which initializes baseline if needed)
         alertService.addPriceData(
           coin.id,
           coin.current_price,
           coin.total_volume,
           Date.now()
         )
+
+        // Set session start baseline if not already set
+        // This creates persistent baselines that survive page refreshes
+        if (!baselineTracker.getBaseline(coin.id)) {
+          baselineTracker.setBaseline(coin.id, coin.current_price, 'session_start')
+        }
       })
 
-      // Subscribe to alerts
+      // Subscribe to alerts (one-time subscription)
       alertService.onAlert((alert) => {
         set({ alerts: alertService.getAlertHistory() })
         notificationService.handleAlert(alert, get().settings.defaultAlertConfig)
       })
 
       set({ cryptoList: data, loading: false })
+
+      console.log(`Initialized ${data.length} cryptocurrencies with persistent baseline tracking`)
     } catch (error) {
       set({
         error: error instanceof Error ? error.message : 'Failed to fetch crypto data',
@@ -120,22 +129,21 @@ export const useCryptoStore = create<CryptoStore>((set, get) => ({
     set((state) => {
       const cryptoList = state.cryptoList.map((coin) => {
         if (coin.id === coinId) {
-          // Get price history to calculate accurate 24h change
-          const priceHistory = alertService.getPriceHistory(coinId)
+          // Use baseline tracker for accurate percentage change from persistent baseline
+          const baselineChange = baselineTracker.getChangeFromBaseline(coinId, price)
 
-          // Calculate 24h percentage change if we have enough history
-          let priceChangePercentage24h = coin.price_change_percentage_24h
-          let priceChange24h = coin.price_change_24h
-
-          // Only recalculate if we have data from 24h ago (24h = 86400000ms)
-          const twentyFourHoursAgo = Date.now() - 86400000
-          const oldPrice = priceHistory.find(h => h.timestamp <= twentyFourHoursAgo)
-
-          if (oldPrice) {
-            priceChange24h = price - oldPrice.price
-            priceChangePercentage24h = ((price - oldPrice.price) / oldPrice.price) * 100
+          // Calculate absolute price change from baseline
+          let priceChangeFromBaseline = 0
+          if (baselineChange !== null) {
+            const baseline = baselineTracker.getBaseline(coinId)
+            if (baseline) {
+              priceChangeFromBaseline = price - baseline.price
+            }
           }
-          // Otherwise preserve the original API values
+
+          // Use baseline change if available, otherwise keep API 24h change
+          const priceChangePercentage24h = baselineChange !== null ? baselineChange : coin.price_change_percentage_24h
+          const priceChange24h = baselineChange !== null ? priceChangeFromBaseline : coin.price_change_24h
 
           const updatedCoin = {
             ...coin,
@@ -146,10 +154,10 @@ export const useCryptoStore = create<CryptoStore>((set, get) => ({
             last_updated: new Date().toISOString(),
           }
 
-          // Add to alert service for monitoring
+          // Add to alert service for monitoring (which also adds to baseline tracker)
           alertService.addPriceData(coinId, price, volume, Date.now())
 
-          // Check for alerts
+          // Check for momentum-based alerts
           alertService.checkForAlerts(updatedCoin, state.settings.defaultAlertConfig)
 
           return updatedCoin
@@ -293,7 +301,8 @@ export const useCryptoStore = create<CryptoStore>((set, get) => ({
 
   // Calculate technical indicators
   calculateIndicators: (coinId: string) => {
-    const priceHistory = alertService.getPriceHistory(coinId)
+    // Use baseline tracker's price history for consistency
+    const priceHistory = baselineTracker.getPriceHistory(coinId)
 
     if (priceHistory.length >= 14) {
       const indicators = TechnicalIndicatorsCalculator.calculateAllIndicators(priceHistory)

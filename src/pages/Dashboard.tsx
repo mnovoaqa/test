@@ -19,14 +19,12 @@ export default function Dashboard() {
   const [viewMode, setViewMode] = useState<'grid' | 'list'>('grid')
 
   useEffect(() => {
+    // Fetch initial data only once
+    // Price polling service handles all subsequent updates
     fetchCryptoData()
 
-    // Set up periodic refresh
-    const interval = setInterval(() => {
-      fetchCryptoData()
-    }, 60000) // Refresh every minute
-
-    return () => clearInterval(interval)
+    // No periodic refresh - poller handles everything to prevent baseline reset
+    // The old 60-second refresh was wiping out poller updates and resetting baselines
   }, [fetchCryptoData])
 
   // Filtered and sorted crypto list

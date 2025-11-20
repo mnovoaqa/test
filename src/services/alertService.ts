@@ -1,5 +1,6 @@
 import type { Alert, AlertConfig, CryptoData, PriceHistory } from '../types/crypto'
 import { TechnicalIndicatorsCalculator } from './technicalIndicators'
+import { baselineTracker } from './baselineTracker'
 
 export class AlertService {
   private priceHistory: Map<string, PriceHistory[]> = new Map()
@@ -8,16 +9,17 @@ export class AlertService {
   private triggeredAlerts: Map<string, number> = new Map() // coinId_type -> timestamp
   private mutedCoins: Set<string> = new Set()
   private alertCallbacks: ((alert: Alert) => void)[] = []
+  private lastAlertMomentum: Map<string, string> = new Map() // coinId -> momentum type
 
-  private readonly PRICE_HISTORY_LIMIT = 100
-  private readonly VOLUME_HISTORY_LIMIT = 100
-  private readonly ALERT_COOLDOWN = 300000 // 5 minutes in milliseconds
+  private readonly PRICE_HISTORY_LIMIT = 1440 // 24 hours at 1-minute (or 4 hours at 10s)
+  private readonly VOLUME_HISTORY_LIMIT = 1440
+  private readonly ALERT_COOLDOWN = 600000 // 10 minutes (increased to reduce spam)
 
   /**
    * Add price data to history
    */
   addPriceData(coinId: string, price: number, volume: number, timestamp: number) {
-    // Add to price history
+    // Add to local price history
     if (!this.priceHistory.has(coinId)) {
       this.priceHistory.set(coinId, [])
     }
@@ -38,6 +40,14 @@ export class AlertService {
 
     if (volHistory.length > this.VOLUME_HISTORY_LIMIT) {
       volHistory.shift()
+    }
+
+    // Add to baseline tracker for momentum analysis
+    baselineTracker.addPriceData(coinId, price, volume, timestamp)
+
+    // Auto-reset baseline if needed
+    if (baselineTracker.shouldResetBaseline(coinId, price)) {
+      baselineTracker.resetBaseline(coinId, price)
     }
   }
 
@@ -86,7 +96,7 @@ export class AlertService {
   }
 
   /**
-   * Check for parabolic price movement
+   * Check for momentum-based alerts with intelligent spam prevention
    * @param coinData Current cryptocurrency data
    * @param config Alert configuration
    */
@@ -101,7 +111,7 @@ export class AlertService {
     const history = this.priceHistory.get(coinData.id) || []
     const volumeHist = this.volumeHistory.get(coinData.id) || []
 
-    if (history.length < 2) {
+    if (history.length < 10) {
       return alerts
     }
 
@@ -109,44 +119,96 @@ export class AlertService {
     const currentVolume = coinData.total_volume
     const currentTime = Date.now()
 
-    // Check price spike (3% in 5 minutes)
-    const timeWindow = config.priceChangeWindow * 60 * 1000 // Convert to ms
-    const recentHistory = history.filter(
-      (h) => currentTime - h.timestamp <= timeWindow
-    )
+    // Get momentum analysis from baseline tracker
+    const trendAnalysis = baselineTracker.analyzeMomentum(coinData.id)
+    if (!trendAnalysis) return alerts
 
-    if (recentHistory.length > 0) {
-      const oldestPrice = recentHistory[0].price
-      const priceChange = currentPrice - oldestPrice
-      const priceChangePercent = (priceChange / oldestPrice) * 100
+    const momentum = trendAnalysis.momentum
 
-      if (Math.abs(priceChangePercent) >= config.priceChangeThreshold) {
-        if (this.canTriggerAlert(coinData.id, 'price_spike')) {
-          const alert: Alert = {
-            id: `${coinData.id}_price_${currentTime}`,
-            coinId: coinData.id,
-            coinSymbol: coinData.symbol.toUpperCase(),
-            coinName: coinData.name,
-            type: 'price_spike',
-            message: `${coinData.name} (${coinData.symbol.toUpperCase()}) ${
-              priceChangePercent > 0 ? 'surged' : 'dropped'
-            } ${Math.abs(priceChangePercent).toFixed(2)}% in ${config.priceChangeWindow} minutes!`,
-            price: currentPrice,
-            priceChange: priceChange,
-            priceChangePercent: priceChangePercent,
-            volume: currentVolume,
-            timestamp: currentTime,
-            triggered: true,
-          }
+    // Get change from baseline
+    const baselineChange = baselineTracker.getChangeFromBaseline(coinData.id, currentPrice)
 
-          alerts.push(alert)
-          this.markAlertTriggered(coinData.id, 'price_spike')
-          this.addToHistory(alert)
+    // ===== MOMENTUM-BASED ALERTS =====
+
+    // 1. PARABOLIC MOVEMENT (Highest priority - rare but critical)
+    if (momentum.type === 'parabolic_up' && momentum.confidence >= 70) {
+      const alertType = 'parabolic_move'
+      if (this.canTriggerAlert(coinData.id, alertType) && this.hasSignificantMomentumChange(coinData.id, alertType)) {
+        const alert: Alert = {
+          id: `${coinData.id}_${alertType}_${currentTime}`,
+          coinId: coinData.id,
+          coinSymbol: coinData.symbol.toUpperCase(),
+          coinName: coinData.name,
+          type: 'price_spike',
+          message: momentum.description,
+          price: currentPrice,
+          priceChange: baselineChange !== null ? (baselineChange / 100) * currentPrice : 0,
+          priceChangePercent: baselineChange || 0,
+          volume: currentVolume,
+          timestamp: currentTime,
+          triggered: true,
         }
+
+        alerts.push(alert)
+        this.markAlertTriggered(coinData.id, alertType)
+        this.lastAlertMomentum.set(coinData.id, alertType)
+        this.addToHistory(alert)
       }
     }
 
-    // Check volume spike (200% above average)
+    // 2. STRONG UPWARD MOMENTUM (Buy signal)
+    if (momentum.type === 'strong_up' && momentum.confidence >= 75) {
+      const alertType = 'strong_upward'
+      if (this.canTriggerAlert(coinData.id, alertType) && this.hasSignificantMomentumChange(coinData.id, alertType)) {
+        const alert: Alert = {
+          id: `${coinData.id}_${alertType}_${currentTime}`,
+          coinId: coinData.id,
+          coinSymbol: coinData.symbol.toUpperCase(),
+          coinName: coinData.name,
+          type: 'price_spike',
+          message: momentum.description,
+          price: currentPrice,
+          priceChange: baselineChange !== null ? (baselineChange / 100) * currentPrice : 0,
+          priceChangePercent: baselineChange || 0,
+          volume: currentVolume,
+          timestamp: currentTime,
+          triggered: true,
+        }
+
+        alerts.push(alert)
+        this.markAlertTriggered(coinData.id, alertType)
+        this.lastAlertMomentum.set(coinData.id, alertType)
+        this.addToHistory(alert)
+      }
+    }
+
+    // 3. STRONG DOWNWARD MOMENTUM (Sell/protect signal)
+    if (momentum.type === 'strong_down' && momentum.confidence >= 75) {
+      const alertType = 'strong_downward'
+      if (this.canTriggerAlert(coinData.id, alertType) && this.hasSignificantMomentumChange(coinData.id, alertType)) {
+        const alert: Alert = {
+          id: `${coinData.id}_${alertType}_${currentTime}`,
+          coinId: coinData.id,
+          coinSymbol: coinData.symbol.toUpperCase(),
+          coinName: coinData.name,
+          type: 'price_spike',
+          message: momentum.description,
+          price: currentPrice,
+          priceChange: baselineChange !== null ? (baselineChange / 100) * currentPrice : 0,
+          priceChangePercent: baselineChange || 0,
+          volume: currentVolume,
+          timestamp: currentTime,
+          triggered: true,
+        }
+
+        alerts.push(alert)
+        this.markAlertTriggered(coinData.id, alertType)
+        this.lastAlertMomentum.set(coinData.id, alertType)
+        this.addToHistory(alert)
+      }
+    }
+
+    // 4. VOLUME SPIKE WITH TREND CONFIRMATION (Only alert if aligned with trend)
     if (volumeHist.length >= 24) {
       const isSpike = TechnicalIndicatorsCalculator.isVolumeSpiking(
         currentVolume,
@@ -154,23 +216,23 @@ export class AlertService {
         config.volumeSpike / 100
       )
 
-      if (isSpike) {
-        if (this.canTriggerAlert(coinData.id, 'volume_spike')) {
+      if (isSpike && (trendAnalysis.shortTerm !== 'neutral' || trendAnalysis.mediumTerm !== 'neutral')) {
+        const alertType = 'volume_spike'
+        if (this.canTriggerAlert(coinData.id, alertType)) {
           const avgVolume = TechnicalIndicatorsCalculator.calculateVolumeAverage(volumeHist)
           const volumeIncrease = ((currentVolume - avgVolume) / avgVolume) * 100
+          const trendDirection = trendAnalysis.shortTerm !== 'neutral' ? trendAnalysis.shortTerm : trendAnalysis.mediumTerm
 
           const alert: Alert = {
-            id: `${coinData.id}_volume_${currentTime}`,
+            id: `${coinData.id}_${alertType}_${currentTime}`,
             coinId: coinData.id,
             coinSymbol: coinData.symbol.toUpperCase(),
             coinName: coinData.name,
             type: 'volume_spike',
-            message: `${coinData.name} (${coinData.symbol.toUpperCase()}) volume spiked ${volumeIncrease.toFixed(
-              0
-            )}% above average!`,
+            message: `📊 VOLUME SPIKE: ${coinData.name} +${volumeIncrease.toFixed(0)}% volume (${trendDirection} trend)`,
             price: currentPrice,
-            priceChange: coinData.price_change_24h,
-            priceChangePercent: coinData.price_change_percentage_24h,
+            priceChange: baselineChange !== null ? (baselineChange / 100) * currentPrice : 0,
+            priceChangePercent: baselineChange || 0,
             volume: currentVolume,
             volumeChange: volumeIncrease,
             timestamp: currentTime,
@@ -178,32 +240,31 @@ export class AlertService {
           }
 
           alerts.push(alert)
-          this.markAlertTriggered(coinData.id, 'volume_spike')
+          this.markAlertTriggered(coinData.id, alertType)
           this.addToHistory(alert)
         }
       }
     }
 
-    // Check RSI indicators
+    // 5. RSI EXTREME WITH TREND DIVERGENCE (Reversal signals)
     if (history.length >= 14) {
       const prices = history.map((h) => h.price)
       const rsi = TechnicalIndicatorsCalculator.calculateRSI(prices)
 
-      // RSI Oversold
-      if (rsi < config.rsiOversold) {
-        if (this.canTriggerAlert(coinData.id, 'rsi_oversold')) {
+      // RSI Oversold + Bearish trend = Potential reversal up
+      if (rsi < config.rsiOversold && trendAnalysis.shortTerm === 'bearish') {
+        const alertType = 'rsi_oversold'
+        if (this.canTriggerAlert(coinData.id, alertType)) {
           const alert: Alert = {
-            id: `${coinData.id}_rsi_oversold_${currentTime}`,
+            id: `${coinData.id}_${alertType}_${currentTime}`,
             coinId: coinData.id,
             coinSymbol: coinData.symbol.toUpperCase(),
             coinName: coinData.name,
             type: 'rsi_oversold',
-            message: `${coinData.name} (${coinData.symbol.toUpperCase()}) is oversold! RSI: ${rsi.toFixed(
-              2
-            )}`,
+            message: `💎 OVERSOLD: ${coinData.name} RSI ${rsi.toFixed(1)} - Potential bounce opportunity`,
             price: currentPrice,
-            priceChange: coinData.price_change_24h,
-            priceChangePercent: coinData.price_change_percentage_24h,
+            priceChange: baselineChange !== null ? (baselineChange / 100) * currentPrice : 0,
+            priceChangePercent: baselineChange || 0,
             volume: currentVolume,
             rsi: rsi,
             timestamp: currentTime,
@@ -211,26 +272,25 @@ export class AlertService {
           }
 
           alerts.push(alert)
-          this.markAlertTriggered(coinData.id, 'rsi_oversold')
+          this.markAlertTriggered(coinData.id, alertType)
           this.addToHistory(alert)
         }
       }
 
-      // RSI Overbought
-      if (rsi > config.rsiOverbought) {
-        if (this.canTriggerAlert(coinData.id, 'rsi_overbought')) {
+      // RSI Overbought + Bullish trend = Take profit signal
+      if (rsi > config.rsiOverbought && trendAnalysis.shortTerm === 'bullish') {
+        const alertType = 'rsi_overbought'
+        if (this.canTriggerAlert(coinData.id, alertType)) {
           const alert: Alert = {
-            id: `${coinData.id}_rsi_overbought_${currentTime}`,
+            id: `${coinData.id}_${alertType}_${currentTime}`,
             coinId: coinData.id,
             coinSymbol: coinData.symbol.toUpperCase(),
             coinName: coinData.name,
             type: 'rsi_overbought',
-            message: `${coinData.name} (${coinData.symbol.toUpperCase()}) is overbought! RSI: ${rsi.toFixed(
-              2
-            )}`,
+            message: `💰 OVERBOUGHT: ${coinData.name} RSI ${rsi.toFixed(1)} - Consider taking profits`,
             price: currentPrice,
-            priceChange: coinData.price_change_24h,
-            priceChangePercent: coinData.price_change_percentage_24h,
+            priceChange: baselineChange !== null ? (baselineChange / 100) * currentPrice : 0,
+            priceChangePercent: baselineChange || 0,
             volume: currentVolume,
             rsi: rsi,
             timestamp: currentTime,
@@ -238,7 +298,7 @@ export class AlertService {
           }
 
           alerts.push(alert)
-          this.markAlertTriggered(coinData.id, 'rsi_overbought')
+          this.markAlertTriggered(coinData.id, alertType)
           this.addToHistory(alert)
         }
       }
@@ -250,6 +310,22 @@ export class AlertService {
     })
 
     return alerts
+  }
+
+  /**
+   * Check if momentum has changed significantly since last alert
+   * Prevents duplicate alerts for same momentum type
+   */
+  private hasSignificantMomentumChange(coinId: string, newMomentumType: string): boolean {
+    const lastMomentum = this.lastAlertMomentum.get(coinId)
+
+    // Always allow if different type
+    if (!lastMomentum || lastMomentum !== newMomentumType) {
+      return true
+    }
+
+    // Same type - only allow if enough time has passed (handled by cooldown)
+    return false
   }
 
   /**
