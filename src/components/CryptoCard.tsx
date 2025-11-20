@@ -20,12 +20,28 @@ export default function CryptoCard({ crypto, onNavigateToChart }: CryptoCardProp
   const priceChange = crypto.price_change_percentage_24h
   const isPositive = priceChange >= 0
 
-  // Fetch predictive signals
+  // Fetch predictive signals safely in useEffect
   useEffect(() => {
-    const priceHistory = alertService.getPriceHistory(crypto.id)
-    if (priceHistory.length > 50) {
-      const signals = predictiveAnalytics.detectPredictiveSignals(priceHistory, crypto.symbol)
-      setPredictiveSignals(signals)
+    let mounted = true
+
+    const fetchSignals = () => {
+      try {
+        const priceHistory = alertService.getPriceHistory(crypto.id)
+        if (priceHistory.length > 50 && mounted) {
+          const signals = predictiveAnalytics.detectPredictiveSignals(priceHistory, crypto.symbol)
+          if (mounted) {
+            setPredictiveSignals(signals)
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching predictive signals:', error)
+      }
+    }
+
+    fetchSignals()
+
+    return () => {
+      mounted = false
     }
   }, [crypto.id, crypto.symbol])
 

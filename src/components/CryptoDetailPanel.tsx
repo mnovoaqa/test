@@ -13,6 +13,7 @@ interface CryptoDetailPanelProps {
 export default function CryptoDetailPanel({ crypto }: CryptoDetailPanelProps) {
   const [enhancedData, setEnhancedData] = useState<EnhancedCryptoData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [priceHistory, setPriceHistory] = useState<Array<{timestamp: number, price: number}>>([])
 
   useEffect(() => {
     let mounted = true
@@ -40,6 +41,31 @@ export default function CryptoDetailPanel({ crypto }: CryptoDetailPanelProps) {
     }
   }, [crypto.id])
 
+  // Fetch price history in a separate effect to avoid render-phase side effects
+  useEffect(() => {
+    let mounted = true
+
+    const fetchPriceHistory = () => {
+      try {
+        const history = alertService.getPriceHistory(crypto.id)
+        if (mounted) {
+          setPriceHistory(history)
+        }
+      } catch (error) {
+        console.error('Error fetching price history:', error)
+        if (mounted) {
+          setPriceHistory([])
+        }
+      }
+    }
+
+    fetchPriceHistory()
+
+    return () => {
+      mounted = false
+    }
+  }, [crypto.id])
+
   if (loading) {
     return (
       <div className="crypto-detail-panel loading">
@@ -59,7 +85,6 @@ export default function CryptoDetailPanel({ crypto }: CryptoDetailPanelProps) {
 
   // Generate price prediction trend
   const predictionData = useMemo(() => {
-    const priceHistory = alertService.getPriceHistory(crypto.id)
     if (priceHistory.length < 20) return null
 
     const recentPrices = priceHistory.slice(-20).map(p => p.price)
@@ -92,7 +117,7 @@ export default function CryptoDetailPanel({ crypto }: CryptoDetailPanelProps) {
       changePercent,
       predictions
     }
-  }, [crypto.id])
+  }, [priceHistory])
 
   const predictionChartOptions: ApexOptions = useMemo(() => ({
     chart: {
@@ -245,12 +270,15 @@ export default function CryptoDetailPanel({ crypto }: CryptoDetailPanelProps) {
             </div>
           </div>
           <div className="prediction-chart">
-            <ReactApexChart
-              options={predictionChartOptions}
-              series={predictionChartSeries}
-              type="line"
-              height={200}
-            />
+            {predictionChartSeries.length > 0 && (
+              <ReactApexChart
+                key={`chart-${crypto.id}`}
+                options={predictionChartOptions}
+                series={predictionChartSeries}
+                type="line"
+                height={200}
+              />
+            )}
           </div>
           <div className="prediction-disclaimer">
             ⚠️ Predictions based on recent price trends. Confidence decreases over time.
