@@ -49,7 +49,7 @@ export interface Alert {
   coinId: string
   coinSymbol: string
   coinName: string
-  type: 'price_spike' | 'volume_spike' | 'rsi_oversold' | 'rsi_overbought'
+  type: 'price_spike' | 'volume_spike' | 'rsi_oversold' | 'rsi_overbought' | 'trend_reversal' | 'breakout' | 'news_catalyst' | 'whale_activity'
   message: string
   price: number
   priceChange: number
@@ -59,6 +59,52 @@ export interface Alert {
   rsi?: number
   timestamp: number
   triggered: boolean
+  confidence?: number
+  predictiveScore?: number
+  newsRelated?: boolean
+}
+
+export interface NewsArticle {
+  id: string
+  coinId: string
+  coinSymbol: string
+  title: string
+  description: string
+  url: string
+  source: string
+  publishedAt: string
+  sentiment: 'positive' | 'negative' | 'neutral'
+  sentimentScore: number
+  relevanceScore: number
+}
+
+export interface MarketSentiment {
+  coinId: string
+  overall: 'bullish' | 'bearish' | 'neutral'
+  score: number // -100 to 100
+  newsCount24h: number
+  socialMentions24h: number
+  lastUpdated: number
+}
+
+export interface PredictiveSignal {
+  type: 'trend_reversal' | 'breakout' | 'momentum_shift' | 'volatility_spike'
+  strength: number // 0-100
+  confidence: number // 0-100
+  timeframe: string
+  description: string
+  timestamp: number
+}
+
+export interface EnhancedCryptoData extends CryptoData {
+  sentiment?: MarketSentiment
+  recentNews?: NewsArticle[]
+  whitePaperUrl?: string
+  predictiveSignals?: PredictiveSignal[]
+  whaleActivity?: {
+    largeTransactions24h: number
+    netFlow: number
+  }
 }
 
 export interface AlertConfig {

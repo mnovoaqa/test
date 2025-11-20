@@ -16,7 +16,8 @@ import { alertService } from '../services/alertService'
 import { TechnicalIndicatorsCalculator } from '../services/technicalIndicators'
 import './Chart.css'
 
-type Timeframe = '1m' | '5m' | '15m' | '1h' | '4h' | '1d'
+type Timeframe = '1m' | '5m' | '15m' | '1h' | '4h' | '1d' | '7d' | '30d' | '90d' | '1y'
+type ChartType = 'candlestick' | 'line'
 type IndicatorType = 'sma' | 'ema' | 'rsi' | 'bollinger' | 'volume'
 
 interface CandleData {
@@ -43,7 +44,8 @@ export default function Chart({ initialCoinId }: ChartProps) {
   const { cryptoList } = useCryptoStore()
   const [selectedCoin, setSelectedCoin] = useState<string>(initialCoinId || 'bitcoin')
   const [searchQuery, setSearchQuery] = useState<string>('')
-  const [timeframe, setTimeframe] = useState<Timeframe>('15m')
+  const [timeframe, setTimeframe] = useState<Timeframe>('30d')
+  const [chartType, setChartType] = useState<ChartType>('candlestick')
   const [activeIndicators, setActiveIndicators] = useState<Set<IndicatorType>>(new Set(['volume']))
 
   const toggleIndicator = (indicator: IndicatorType) => {
@@ -210,12 +212,13 @@ export default function Chart({ initialCoinId }: ChartProps) {
   // Format time for X-axis
   const formatTime = (value: number) => {
     const date = new Date(value * 1000)
-    if (timeframe === '1m' || timeframe === '5m') {
+    if (timeframe === '1m' || timeframe === '5m' || timeframe === '15m' || timeframe === '1h') {
       return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    } else if (timeframe === '15m' || timeframe === '1h') {
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    } else {
+    } else if (timeframe === '4h' || timeframe === '1d' || timeframe === '7d') {
       return date.toLocaleDateString([], { month: 'short', day: 'numeric' })
+    } else {
+      // For 30d, 90d, 1y show month and year
+      return date.toLocaleDateString([], { month: 'short', year: '2-digit' })
     }
   }
 
@@ -264,9 +267,25 @@ export default function Chart({ initialCoinId }: ChartProps) {
       </div>
 
       <div className="chart-controls">
+        <div className="chart-type-selector">
+          <span className="control-label">Chart Type:</span>
+          <button
+            className={`chart-type-btn ${chartType === 'candlestick' ? 'active' : ''}`}
+            onClick={() => setChartType('candlestick')}
+          >
+            Candlestick
+          </button>
+          <button
+            className={`chart-type-btn ${chartType === 'line' ? 'active' : ''}`}
+            onClick={() => setChartType('line')}
+          >
+            Line
+          </button>
+        </div>
+
         <div className="timeframe-selector">
           <span className="control-label">Timeframe:</span>
-          {(['1m', '5m', '15m', '1h', '4h', '1d'] as Timeframe[]).map(tf => (
+          {(['1m', '5m', '15m', '1h', '4h', '1d', '7d', '30d', '90d', '1y'] as Timeframe[]).map(tf => (
             <button
               key={tf}
               className={`timeframe-btn ${timeframe === tf ? 'active' : ''}`}
@@ -368,13 +387,25 @@ export default function Chart({ initialCoinId }: ChartProps) {
                     />
                   )}
 
-                  {/* Candlesticks rendered as custom shape */}
-                  <Bar
-                    yAxisId="price"
-                    dataKey="high"
-                    shape={<Candlestick />}
-                    name="Price"
-                  />
+                  {/* Candlesticks or Line Chart */}
+                  {chartType === 'candlestick' ? (
+                    <Bar
+                      yAxisId="price"
+                      dataKey="high"
+                      shape={<Candlestick />}
+                      name="Price"
+                    />
+                  ) : (
+                    <Line
+                      yAxisId="price"
+                      type="monotone"
+                      dataKey="close"
+                      stroke="#2196F3"
+                      strokeWidth={2}
+                      dot={false}
+                      name="Price"
+                    />
+                  )}
 
                   {/* Bollinger Bands */}
                   {activeIndicators.has('bollinger') && (
@@ -504,6 +535,10 @@ function aggregateToCandlesticks(
     '1h': 60 * 60 * 1000,
     '4h': 4 * 60 * 60 * 1000,
     '1d': 24 * 60 * 60 * 1000,
+    '7d': 7 * 24 * 60 * 60 * 1000,
+    '30d': 30 * 24 * 60 * 60 * 1000,
+    '90d': 90 * 24 * 60 * 60 * 1000,
+    '1y': 365 * 24 * 60 * 60 * 1000,
   }[timeframe]
 
   const candles: { [key: number]: { open: number; high: number; low: number; close: number; volume: number; prices: number[] } } = {}

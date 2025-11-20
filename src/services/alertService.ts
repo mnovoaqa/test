@@ -1,6 +1,8 @@
 import type { Alert, AlertConfig, CryptoData, PriceHistory } from '../types/crypto'
 import { TechnicalIndicatorsCalculator } from './technicalIndicators'
 import { baselineTracker } from './baselineTracker'
+import { newsService } from './newsService'
+import { predictiveAnalytics } from './predictiveAnalytics'
 
 export class AlertService {
   private priceHistory: Map<string, PriceHistory[]> = new Map()
@@ -388,6 +390,180 @@ export class AlertService {
    */
   getPriceHistory(coinId: string): PriceHistory[] {
     return this.priceHistory.get(coinId) || []
+  }
+
+  /**
+   * Check for predictive signals and create alerts
+   * Uses advanced analytics to detect emerging trends early
+   */
+  async checkPredictiveSignals(coinData: CryptoData): Promise<Alert[]> {
+    const alerts: Alert[] = []
+
+    // Skip if coin is muted
+    if (this.mutedCoins.has(coinData.id)) {
+      return alerts
+    }
+
+    const history = this.priceHistory.get(coinData.id) || []
+    if (history.length < 50) {
+      return alerts // Need sufficient history for predictions
+    }
+
+    // Get predictive signals
+    const signals = predictiveAnalytics.detectPredictiveSignals(history, coinData.symbol)
+
+    if (signals.length === 0) {
+      return alerts
+    }
+
+    // Calculate overall confidence
+    const overallConfidence = predictiveAnalytics.calculateOverallConfidence(signals)
+
+    // Only alert on high-confidence signals
+    if (overallConfidence < 70) {
+      return alerts
+    }
+
+    // Group signals by type to avoid spam
+    const signalsByType = new Map<string, typeof signals>()
+    signals.forEach(signal => {
+      const existing = signalsByType.get(signal.type) || []
+      existing.push(signal)
+      signalsByType.set(signal.type, existing)
+    })
+
+    // Create alerts for each signal type
+    for (const [type, typeSignals] of signalsByType.entries()) {
+      const alertType = `predictive_${type}`
+      if (this.canTriggerAlert(coinData.id, alertType)) {
+        const bestSignal = typeSignals.reduce((best, current) =>
+          current.confidence > best.confidence ? current : best
+        )
+
+        const alert: Alert = {
+          id: `${coinData.id}_${alertType}_${Date.now()}`,
+          coinId: coinData.id,
+          coinSymbol: coinData.symbol.toUpperCase(),
+          coinName: coinData.name,
+          type: type === 'breakout' ? 'price_spike' : type === 'trend_reversal' ? 'price_spike' : 'volume_spike',
+          message: `🔮 PREDICTIVE: ${bestSignal.description}`,
+          price: coinData.current_price,
+          priceChange: coinData.price_change_24h || 0,
+          priceChangePercent: coinData.price_change_percentage_24h || 0,
+          volume: coinData.total_volume,
+          timestamp: Date.now(),
+          triggered: true,
+          confidence: overallConfidence,
+          predictiveScore: bestSignal.strength
+        }
+
+        alerts.push(alert)
+        this.markAlertTriggered(coinData.id, alertType)
+        this.addToHistory(alert)
+      }
+    }
+
+    // Trigger callbacks
+    alerts.forEach((alert) => {
+      this.alertCallbacks.forEach((callback) => callback(alert))
+    })
+
+    return alerts
+  }
+
+  /**
+   * Check for news-based alerts
+   * Combines news sentiment with price action for high-confidence alerts
+   */
+  async checkNewsAlerts(coinData: CryptoData): Promise<Alert[]> {
+    const alerts: Alert[] = []
+
+    // Skip if coin is muted
+    if (this.mutedCoins.has(coinData.id)) {
+      return alerts
+    }
+
+    try {
+      // Fetch news and check if it should trigger alert
+      const articles = await newsService.fetchNewsForCoin(coinData.id, coinData.symbol)
+      const newsCheck = newsService.shouldTriggerNewsAlert(articles)
+
+      if (!newsCheck.shouldTrigger) {
+        return alerts
+      }
+
+      // Check if we can trigger this alert (cooldown)
+      const alertType = 'news_catalyst'
+      if (!this.canTriggerAlert(coinData.id, alertType)) {
+        return alerts
+      }
+
+      // Get market sentiment
+      const sentiment = await newsService.getMarketSentiment(coinData.id, coinData.symbol)
+
+      // Combine news signal with price action for stronger confidence
+      const baselineChange = baselineTracker.getChangeFromBaseline(coinData.id, coinData.current_price)
+      let confidenceBoost = 0
+
+      // Boost confidence if price action aligns with news sentiment
+      if (sentiment.overall === 'bullish' && baselineChange && baselineChange > 2) {
+        confidenceBoost = 10
+      } else if (sentiment.overall === 'bearish' && baselineChange && baselineChange < -2) {
+        confidenceBoost = 10
+      }
+
+      const finalConfidence = Math.min(newsCheck.confidence + confidenceBoost, 100)
+
+      const alert: Alert = {
+        id: `${coinData.id}_${alertType}_${Date.now()}`,
+        coinId: coinData.id,
+        coinSymbol: coinData.symbol.toUpperCase(),
+        coinName: coinData.name,
+        type: 'price_spike',
+        message: `📰 NEWS ALERT: ${newsCheck.reason} (${sentiment.overall.toUpperCase()} sentiment)`,
+        price: coinData.current_price,
+        priceChange: coinData.price_change_24h || 0,
+        priceChangePercent: coinData.price_change_percentage_24h || 0,
+        volume: coinData.total_volume,
+        timestamp: Date.now(),
+        triggered: true,
+        confidence: finalConfidence,
+        newsRelated: true
+      }
+
+      alerts.push(alert)
+      this.markAlertTriggered(coinData.id, alertType)
+      this.addToHistory(alert)
+
+      // Trigger callbacks
+      this.alertCallbacks.forEach((callback) => callback(alert))
+    } catch (error) {
+      console.error('Error checking news alerts:', error)
+    }
+
+    return alerts
+  }
+
+  /**
+   * Comprehensive alert check combining all detection methods
+   * This is the main entry point for the enhanced alert system
+   */
+  async checkAllAlerts(coinData: CryptoData, config: AlertConfig): Promise<Alert[]> {
+    const allAlerts: Alert[] = []
+
+    // 1. Traditional technical alerts (existing system)
+    const technicalAlerts = this.checkForAlerts(coinData, config)
+    allAlerts.push(...technicalAlerts)
+
+    // 2. Predictive analytics alerts (new)
+    const predictiveAlerts = await this.checkPredictiveSignals(coinData)
+    allAlerts.push(...predictiveAlerts)
+
+    // 3. News-based alerts (new)
+    const newsAlerts = await this.checkNewsAlerts(coinData)
+    allAlerts.push(...newsAlerts)
+
+    return allAlerts
   }
 }
 

@@ -149,7 +149,8 @@
 }
 
 .timeframe-selector,
-.indicator-selector {
+.indicator-selector,
+.chart-type-selector {
   display: flex;
   gap: 0.5rem;
   align-items: center;
@@ -164,7 +165,8 @@
 }
 
 .timeframe-btn,
-.indicator-btn {
+.indicator-btn,
+.chart-type-btn {
   padding: 0.5rem 1rem;
   background: var(--bg-primary);
   border: 1px solid var(--border-color);
@@ -177,14 +179,16 @@
 }
 
 .timeframe-btn:hover,
-.indicator-btn:hover {
+.indicator-btn:hover,
+.chart-type-btn:hover {
   background: var(--card-bg);
   border-color: var(--accent-blue);
   color: var(--text-primary);
 }
 
 .timeframe-btn.active,
-.indicator-btn.active {
+.indicator-btn.active,
+.chart-type-btn.active {
   background: var(--accent-blue);
   border-color: var(--accent-blue);
   color: white;
