@@ -14,6 +14,7 @@ export default function Chart() {
   const [selectedCoin, setSelectedCoin] = useState<string>('bitcoin')
   const [timeframe, setTimeframe] = useState<Timeframe>('15m')
   const [activeIndicators, setActiveIndicators] = useState<Set<IndicatorType>>(new Set(['volume']))
+  const [chartReady, setChartReady] = useState(false)
 
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<IChartApi | null>(null)
@@ -51,6 +52,8 @@ export default function Chart() {
     })
 
     chartRef.current = chart
+    setChartReady(true)
+    console.log('Main chart initialized successfully')
 
     // Handle resize
     const handleResize = () => {
@@ -65,6 +68,7 @@ export default function Chart() {
 
     return () => {
       window.removeEventListener('resize', handleResize)
+      setChartReady(false)
       chart.remove()
       chartRef.current = null
     }
@@ -124,249 +128,305 @@ export default function Chart() {
 
   // Update chart data
   useEffect(() => {
-    if (!chartRef.current) return
+    if (!chartReady || !chartRef.current) {
+      console.log('Chart not ready yet. chartReady:', chartReady, 'chartRef.current:', !!chartRef.current)
+      return
+    }
 
     const coin = cryptoList.find(c => c.id === selectedCoin)
-    if (!coin) return
+    if (!coin) {
+      console.log('Coin not found:', selectedCoin)
+      return
+    }
 
     // Get price history
     const priceHistory = alertService.getPriceHistory(selectedCoin)
 
-    if (priceHistory.length === 0) return
+    if (priceHistory.length === 0) {
+      console.log('No price history available')
+      return
+    }
 
     // Convert to candlestick data
     const candleData = aggregateToCandlesticks(priceHistory, timeframe)
 
-    if (candleData.length === 0) return
+    if (candleData.length === 0) {
+      console.log('No candle data after aggregation')
+      return
+    }
 
-    // Clear all series
-    seriesRefs.current.forEach(series => {
-      if (chartRef.current) {
-        chartRef.current.removeSeries(series)
+    console.log('Updating chart with', candleData.length, 'candles')
+
+    try {
+      // Clear all series
+      seriesRefs.current.forEach(series => {
+        if (chartRef.current) {
+          chartRef.current.removeSeries(series)
+        }
+      })
+      seriesRefs.current = []
+
+      // Verify chart instance has the method
+      if (typeof chartRef.current.addCandlestickSeries !== 'function') {
+        console.error('addCandlestickSeries is not a function on chart instance:', chartRef.current)
+        console.error('Available methods:', Object.keys(chartRef.current))
+        return
       }
-    })
-    seriesRefs.current = []
 
-    // Add candlestick series
-    // @ts-ignore - lightweight-charts type issue
-    const candlestickSeries = chartRef.current.addCandlestickSeries({
-      upColor: '#26a69a',
-      downColor: '#ef5350',
-      borderVisible: false,
-      wickUpColor: '#26a69a',
-      wickDownColor: '#ef5350',
-    })
-
-    const mappedCandles = candleData.map(c => ({
-      time: c.time as Time,
-      open: c.open,
-      high: c.high,
-      low: c.low,
-      close: c.close,
-    }))
-
-    candlestickSeries.setData(mappedCandles)
-    seriesRefs.current.push(candlestickSeries)
-
-    // Add volume if enabled
-    if (activeIndicators.has('volume')) {
-      // @ts-ignore - lightweight-charts type issue
-      const volumeSeries = chartRef.current.addHistogramSeries({
-        color: '#26a69a',
-        priceFormat: {
-          type: 'volume',
-        },
-        priceScaleId: 'volume',
+      // Add candlestick series
+      const candlestickSeries = chartRef.current.addCandlestickSeries({
+        upColor: '#26a69a',
+        downColor: '#ef5350',
+        borderVisible: false,
+        wickUpColor: '#26a69a',
+        wickDownColor: '#ef5350',
       })
 
-      // @ts-ignore - lightweight-charts type issue
-      chartRef.current.priceScale('volume').applyOptions({
-        scaleMargins: {
-          top: 0.8,
-          bottom: 0,
-        },
-      })
+      console.log('Candlestick series created successfully')
+    } catch (error) {
+      console.error('Error creating candlestick series:', error)
+      return
+    }
 
-      const volumeData = candleData.map(c => ({
+    try {
+      const mappedCandles = candleData.map(c => ({
         time: c.time as Time,
-        value: c.volume,
-        color: c.close >= c.open ? '#26a69a80' : '#ef535080',
+        open: c.open,
+        high: c.high,
+        low: c.low,
+        close: c.close,
       }))
 
-      volumeSeries.setData(volumeData)
-      seriesRefs.current.push(volumeSeries)
+      candlestickSeries.setData(mappedCandles)
+      seriesRefs.current.push(candlestickSeries)
+      console.log('Candlestick data set successfully')
+    } catch (error) {
+      console.error('Error setting candlestick data:', error)
+      return
+    }
+
+    // Add volume if enabled
+    if (activeIndicators.has('volume') && chartRef.current) {
+      try {
+        const volumeSeries = chartRef.current.addHistogramSeries({
+          color: '#26a69a',
+          priceFormat: {
+            type: 'volume',
+          },
+          priceScaleId: 'volume',
+        })
+
+        chartRef.current.priceScale('volume').applyOptions({
+          scaleMargins: {
+            top: 0.8,
+            bottom: 0,
+          },
+        })
+
+        const volumeData = candleData.map(c => ({
+          time: c.time as Time,
+          value: c.volume,
+          color: c.close >= c.open ? '#26a69a80' : '#ef535080',
+        }))
+
+        volumeSeries.setData(volumeData)
+        seriesRefs.current.push(volumeSeries)
+        console.log('Volume series added successfully')
+      } catch (error) {
+        console.error('Error adding volume series:', error)
+      }
     }
 
     // Calculate and display SMA if enabled
-    if (activeIndicators.has('sma')) {
-      const prices = candleData.map(c => c.close)
-      const sma20 = TechnicalIndicatorsCalculator.calculateSMASeries(prices, 20)
+    if (activeIndicators.has('sma') && chartRef.current) {
+      try {
+        const prices = candleData.map(c => c.close)
+        const sma20 = TechnicalIndicatorsCalculator.calculateSMASeries(prices, 20)
 
-      if (sma20.length > 0) {
-        // @ts-ignore - lightweight-charts type issue
-        const smaSeries = chartRef.current.addLineSeries({
-          color: '#2196F3',
-          lineWidth: 2,
-          title: 'SMA 20',
-        })
+        if (sma20.length > 0) {
+          const smaSeries = chartRef.current.addLineSeries({
+            color: '#2196F3',
+            lineWidth: 2,
+            title: 'SMA 20',
+          })
 
-        const smaData = sma20.map((value, index) => ({
-          time: candleData[index].time as Time,
-          value,
-        }))
+          const smaData = sma20.map((value, index) => ({
+            time: candleData[index].time as Time,
+            value,
+          }))
 
-        smaSeries.setData(smaData)
-        seriesRefs.current.push(smaSeries)
+          smaSeries.setData(smaData)
+          seriesRefs.current.push(smaSeries)
+          console.log('SMA series added successfully')
+        }
+      } catch (error) {
+        console.error('Error adding SMA series:', error)
       }
     }
 
     // Calculate and display EMA if enabled
-    if (activeIndicators.has('ema')) {
-      const prices = candleData.map(c => c.close)
-      const ema12 = TechnicalIndicatorsCalculator.calculateEMASeries(prices, 12)
+    if (activeIndicators.has('ema') && chartRef.current) {
+      try {
+        const prices = candleData.map(c => c.close)
+        const ema12 = TechnicalIndicatorsCalculator.calculateEMASeries(prices, 12)
 
-      if (ema12.length > 0) {
-        // @ts-ignore - lightweight-charts type issue
-        const emaSeries = chartRef.current.addLineSeries({
-          color: '#FF6B35',
-          lineWidth: 2,
-          title: 'EMA 12',
-        })
+        if (ema12.length > 0) {
+          const emaSeries = chartRef.current.addLineSeries({
+            color: '#FF6B35',
+            lineWidth: 2,
+            title: 'EMA 12',
+          })
 
-        const emaData = ema12.map((value, index) => ({
-          time: candleData[index + (prices.length - ema12.length)].time as Time,
-          value,
-        }))
+          const emaData = ema12.map((value, index) => ({
+            time: candleData[index + (prices.length - ema12.length)].time as Time,
+            value,
+          }))
 
-        emaSeries.setData(emaData)
-        seriesRefs.current.push(emaSeries)
+          emaSeries.setData(emaData)
+          seriesRefs.current.push(emaSeries)
+          console.log('EMA series added successfully')
+        }
+      } catch (error) {
+        console.error('Error adding EMA series:', error)
       }
     }
 
     // Calculate and display Bollinger Bands if enabled
-    if (activeIndicators.has('bollinger')) {
-      const prices = candleData.map(c => c.close)
-      const bollinger = TechnicalIndicatorsCalculator.calculateBollingerBandsSeries(prices, 20, 2)
+    if (activeIndicators.has('bollinger') && chartRef.current) {
+      try {
+        const prices = candleData.map(c => c.close)
+        const bollinger = TechnicalIndicatorsCalculator.calculateBollingerBandsSeries(prices, 20, 2)
 
-      if (bollinger.upper.length > 0) {
-        // @ts-ignore - lightweight-charts type issue
-        const bollingerUpperSeries = chartRef.current.addLineSeries({
-          color: '#9C27B0',
-          lineWidth: 1,
-          lineStyle: LineStyle.Dashed,
-          title: 'BB Upper',
-        })
+        if (bollinger.upper.length > 0) {
+          const bollingerUpperSeries = chartRef.current.addLineSeries({
+            color: '#9C27B0',
+            lineWidth: 1,
+            lineStyle: LineStyle.Dashed,
+            title: 'BB Upper',
+          })
 
-        // @ts-ignore - lightweight-charts type issue
-        const bollingerMiddleSeries = chartRef.current.addLineSeries({
-          color: '#9C27B0',
-          lineWidth: 1,
-          title: 'BB Middle',
-        })
+          const bollingerMiddleSeries = chartRef.current.addLineSeries({
+            color: '#9C27B0',
+            lineWidth: 1,
+            title: 'BB Middle',
+          })
 
-        // @ts-ignore - lightweight-charts type issue
-        const bollingerLowerSeries = chartRef.current.addLineSeries({
-          color: '#9C27B0',
-          lineWidth: 1,
-          lineStyle: LineStyle.Dashed,
-          title: 'BB Lower',
-        })
+          const bollingerLowerSeries = chartRef.current.addLineSeries({
+            color: '#9C27B0',
+            lineWidth: 1,
+            lineStyle: LineStyle.Dashed,
+            title: 'BB Lower',
+          })
 
-        bollingerUpperSeries.setData(
-          bollinger.upper.map((value, index) => ({
-            time: candleData[index].time as Time,
-            value,
-          }))
-        )
+          bollingerUpperSeries.setData(
+            bollinger.upper.map((value, index) => ({
+              time: candleData[index].time as Time,
+              value,
+            }))
+          )
 
-        bollingerMiddleSeries.setData(
-          bollinger.middle.map((value, index) => ({
-            time: candleData[index].time as Time,
-            value,
-          }))
-        )
+          bollingerMiddleSeries.setData(
+            bollinger.middle.map((value, index) => ({
+              time: candleData[index].time as Time,
+              value,
+            }))
+          )
 
-        bollingerLowerSeries.setData(
-          bollinger.lower.map((value, index) => ({
-            time: candleData[index].time as Time,
-            value,
-          }))
-        )
+          bollingerLowerSeries.setData(
+            bollinger.lower.map((value, index) => ({
+              time: candleData[index].time as Time,
+              value,
+            }))
+          )
 
-        seriesRefs.current.push(bollingerUpperSeries, bollingerMiddleSeries, bollingerLowerSeries)
+          seriesRefs.current.push(bollingerUpperSeries, bollingerMiddleSeries, bollingerLowerSeries)
+          console.log('Bollinger Bands added successfully')
+        }
+      } catch (error) {
+        console.error('Error adding Bollinger Bands:', error)
       }
     }
 
     // Calculate and display RSI if enabled
     if (activeIndicators.has('rsi') && rsiChartRef.current) {
-      // Clear RSI chart series
-      rsiSeriesRefs.current.forEach(series => {
-        if (rsiChartRef.current) {
-          rsiChartRef.current.removeSeries(series)
-        }
-      })
-      rsiSeriesRefs.current = []
-
-      const prices = candleData.map(c => c.close)
-
-      // @ts-ignore - lightweight-charts type issue
-      const rsiSeries = rsiChartRef.current.addLineSeries({
-        color: '#2962FF',
-        lineWidth: 2,
-      })
-
-      // Add reference lines for RSI
-      const options = {
-        priceScaleId: 'right',
-        lastValueVisible: false,
-        priceLineVisible: false,
-      }
-
-      // Overbought line (70)
-      rsiSeries.createPriceLine({
-        price: 70,
-        color: '#ef5350',
-        lineWidth: 1,
-        lineStyle: LineStyle.Dashed,
-        axisLabelVisible: true,
-        title: 'Overbought',
-        ...options,
-      })
-
-      // Oversold line (30)
-      rsiSeries.createPriceLine({
-        price: 30,
-        color: '#26a69a',
-        lineWidth: 1,
-        lineStyle: LineStyle.Dashed,
-        axisLabelVisible: true,
-        title: 'Oversold',
-        ...options,
-      })
-
-      // Generate RSI data for all points
-      const rsiData = []
-      for (let i = 14; i < prices.length; i++) {
-        const rsi = TechnicalIndicatorsCalculator.calculateRSI(prices.slice(0, i + 1), 14)
-        rsiData.push({
-          time: candleData[i].time as Time,
-          value: rsi,
+      try {
+        // Clear RSI chart series
+        rsiSeriesRefs.current.forEach(series => {
+          if (rsiChartRef.current) {
+            rsiChartRef.current.removeSeries(series)
+          }
         })
-      }
+        rsiSeriesRefs.current = []
 
-      if (rsiData.length > 0) {
-        rsiSeries.setData(rsiData)
-        rsiSeriesRefs.current.push(rsiSeries)
+        const prices = candleData.map(c => c.close)
+
+        const rsiSeries = rsiChartRef.current.addLineSeries({
+          color: '#2962FF',
+          lineWidth: 2,
+        })
+
+        // Add reference lines for RSI
+        const options = {
+          priceScaleId: 'right',
+          lastValueVisible: false,
+          priceLineVisible: false,
+        }
+
+        // Overbought line (70)
+        rsiSeries.createPriceLine({
+          price: 70,
+          color: '#ef5350',
+          lineWidth: 1,
+          lineStyle: LineStyle.Dashed,
+          axisLabelVisible: true,
+          title: 'Overbought',
+          ...options,
+        })
+
+        // Oversold line (30)
+        rsiSeries.createPriceLine({
+          price: 30,
+          color: '#26a69a',
+          lineWidth: 1,
+          lineStyle: LineStyle.Dashed,
+          axisLabelVisible: true,
+          title: 'Oversold',
+          ...options,
+        })
+
+        // Generate RSI data for all points
+        const rsiData = []
+        for (let i = 14; i < prices.length; i++) {
+          const rsi = TechnicalIndicatorsCalculator.calculateRSI(prices.slice(0, i + 1), 14)
+          rsiData.push({
+            time: candleData[i].time as Time,
+            value: rsi,
+          })
+        }
+
+        if (rsiData.length > 0) {
+          rsiSeries.setData(rsiData)
+          rsiSeriesRefs.current.push(rsiSeries)
+          console.log('RSI series added successfully')
+        }
+      } catch (error) {
+        console.error('Error adding RSI series:', error)
       }
     }
 
     // Fit content
-    chartRef.current.timeScale().fitContent()
-    if (rsiChartRef.current) {
-      rsiChartRef.current.timeScale().fitContent()
+    try {
+      if (chartRef.current) {
+        chartRef.current.timeScale().fitContent()
+      }
+      if (rsiChartRef.current) {
+        rsiChartRef.current.timeScale().fitContent()
+      }
+    } catch (error) {
+      console.error('Error fitting content:', error)
     }
 
-  }, [selectedCoin, timeframe, activeIndicators, cryptoList])
+  }, [chartReady, selectedCoin, timeframe, activeIndicators, cryptoList])
 
   const toggleIndicator = (indicator: IndicatorType) => {
     setActiveIndicators(prev => {
