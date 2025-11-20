@@ -1,6 +1,8 @@
-import { useState } from 'react'
-import type { CryptoData } from '../types/crypto'
+import { useState, useEffect } from 'react'
+import type { CryptoData, PredictiveSignal } from '../types/crypto'
 import { useCryptoStore } from '../stores/cryptoStore'
+import { alertService } from '../services/alertService'
+import { predictiveAnalytics } from '../services/predictiveAnalytics'
 import CryptoDetailPanel from './CryptoDetailPanel'
 
 interface CryptoCardProps {
@@ -13,9 +15,60 @@ export default function CryptoCard({ crypto, onNavigateToChart }: CryptoCardProp
   const isFavorite = settings.favoriteCoins.includes(crypto.id)
   const [showWatchlistMenu, setShowWatchlistMenu] = useState(false)
   const [isExpanded, setIsExpanded] = useState(false)
+  const [predictiveSignals, setPredictiveSignals] = useState<PredictiveSignal[]>([])
 
   const priceChange = crypto.price_change_percentage_24h
   const isPositive = priceChange >= 0
+
+  // Fetch predictive signals
+  useEffect(() => {
+    const priceHistory = alertService.getPriceHistory(crypto.id)
+    if (priceHistory.length > 50) {
+      const signals = predictiveAnalytics.detectPredictiveSignals(priceHistory, crypto.symbol)
+      setPredictiveSignals(signals)
+    }
+  }, [crypto.id, crypto.symbol])
+
+  // Get signal badge info
+  const getSignalBadge = (signal: PredictiveSignal) => {
+    const isBullish = signal.description.toLowerCase().includes('bullish') ||
+                      signal.description.toLowerCase().includes('upward')
+    const isBearish = signal.description.toLowerCase().includes('bearish') ||
+                      signal.description.toLowerCase().includes('downward')
+
+    let emoji = '📊'
+    let color = '#6b7280'
+    let label = ''
+
+    switch (signal.type) {
+      case 'momentum_shift':
+        emoji = isBullish ? '🔥' : '❄️'
+        color = isBullish ? '#10b981' : '#ef4444'
+        label = 'Momentum'
+        break
+      case 'breakout':
+        emoji = isBullish ? '🚀' : '📉'
+        color = isBullish ? '#10b981' : '#ef4444'
+        label = 'Breakout'
+        break
+      case 'trend_reversal':
+        emoji = '🔄'
+        color = isBullish ? '#10b981' : '#ef4444'
+        label = 'Reversal'
+        break
+      case 'volatility_spike':
+        emoji = '⚡'
+        color = '#f59e0b'
+        label = 'Volatility'
+        break
+      default:
+        emoji = '📈'
+        color = '#6b7280'
+        label = 'Signal'
+    }
+
+    return { emoji, color, label, isBullish, isBearish }
+  }
 
   const formatPrice = (price: number) => {
     if (price < 0.01) {
@@ -138,6 +191,27 @@ export default function CryptoCard({ crypto, onNavigateToChart }: CryptoCardProp
           </button>
         </div>
       </div>
+
+      {/* Predictive Signals Badges */}
+      {predictiveSignals.length > 0 && (
+        <div className="predictive-signals-badges">
+          {predictiveSignals.slice(0, 2).map((signal, index) => {
+            const badge = getSignalBadge(signal)
+            return (
+              <div
+                key={index}
+                className="signal-badge"
+                style={{ borderColor: badge.color, color: badge.color }}
+                title={`${signal.description} (Confidence: ${signal.confidence}%)`}
+              >
+                <span className="signal-emoji">{badge.emoji}</span>
+                <span className="signal-label">{badge.label}</span>
+                <span className="signal-confidence">{signal.confidence}%</span>
+              </div>
+            )
+          })}
+        </div>
+      )}
 
       <div className="crypto-price">
         <div className="current-price">{formatPrice(crypto.current_price)}</div>

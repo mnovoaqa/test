@@ -412,6 +412,49 @@ input[type='number'] {
   gap: 0.75rem;
 }
 
+.predictive-signals-badges {
+  display: flex;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+  flex-wrap: wrap;
+}
+
+.signal-badge {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.65rem;
+  border: 1.5px solid;
+  border-radius: 6px;
+  font-size: 0.75rem;
+  font-weight: 600;
+  background: rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(10px);
+  transition: all 0.2s;
+}
+
+.signal-badge:hover {
+  transform: scale(1.05);
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.signal-emoji {
+  font-size: 0.9rem;
+  line-height: 1;
+}
+
+.signal-label {
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.3px;
+}
+
+.signal-confidence {
+  font-size: 0.7rem;
+  opacity: 0.8;
+  font-weight: 500;
+}
+
 .crypto-image {
   width: 40px;
   height: 40px;

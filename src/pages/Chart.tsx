@@ -153,49 +153,75 @@ export default function Chart({ initialCoinId }: ChartProps) {
       return
     }
 
-    // Create chart
-    const chart = createChart(chartContainerRef.current, {
-      width: chartContainerRef.current.clientWidth,
-      height: 500,
-      layout: {
-        background: { color: 'transparent' },
-        textColor: '#6b7280',
-      },
-      grid: {
-        vertLines: { color: '#374151' },
-        horzLines: { color: '#374151' },
-      },
-      crosshair: {
-        mode: 1,
-      },
-      rightPriceScale: {
-        borderColor: '#374151',
-      },
-      timeScale: {
-        borderColor: '#374151',
-        timeVisible: true,
-        secondsVisible: false,
-      },
-    })
+    let isMounted = true
 
-    chartRef.current = chart
+    // Use requestAnimationFrame to ensure DOM is fully ready
+    const initializeChart = () => {
+      requestAnimationFrame(() => {
+        if (!chartContainerRef.current || !isMounted) return
 
-    // Mark chart as ready after initialization
-    setIsChartReady(true)
+        try {
+          // Create chart
+          const chart = createChart(chartContainerRef.current, {
+            width: chartContainerRef.current.clientWidth,
+            height: 500,
+            layout: {
+              background: { color: 'transparent' },
+              textColor: '#6b7280',
+            },
+            grid: {
+              vertLines: { color: '#374151' },
+              horzLines: { color: '#374151' },
+            },
+            crosshair: {
+              mode: 1,
+            },
+            rightPriceScale: {
+              borderColor: '#374151',
+            },
+            timeScale: {
+              borderColor: '#374151',
+              timeVisible: true,
+              secondsVisible: false,
+            },
+          })
+
+          chartRef.current = chart
+
+          // Mark chart as ready after a small delay to ensure full initialization
+          setTimeout(() => {
+            if (isMounted) {
+              setIsChartReady(true)
+            }
+          }, 50)
+        } catch (error) {
+          console.error('Error initializing chart:', error)
+        }
+      })
+    }
+
+    initializeChart()
 
     // Handle resize
     const handleResize = () => {
-      if (chartContainerRef.current && chart) {
-        chart.applyOptions({ width: chartContainerRef.current.clientWidth })
+      if (chartContainerRef.current && chartRef.current) {
+        chartRef.current.applyOptions({ width: chartContainerRef.current.clientWidth })
       }
     }
 
     window.addEventListener('resize', handleResize)
 
     return () => {
+      isMounted = false
       window.removeEventListener('resize', handleResize)
       setIsChartReady(false)
-      chart.remove()
+      if (chartRef.current) {
+        try {
+          chartRef.current.remove()
+        } catch (error) {
+          console.warn('Error removing chart:', error)
+        }
+      }
       chartRef.current = null
       seriesRefs.current.clear()
     }
@@ -208,46 +234,72 @@ export default function Chart({ initialCoinId }: ChartProps) {
       return
     }
 
-    // Create RSI chart
-    const rsiChart = createChart(rsiChartContainerRef.current, {
-      width: rsiChartContainerRef.current.clientWidth,
-      height: 150,
-      layout: {
-        background: { color: 'transparent' },
-        textColor: '#6b7280',
-      },
-      grid: {
-        vertLines: { color: '#374151' },
-        horzLines: { color: '#374151' },
-      },
-      rightPriceScale: {
-        borderColor: '#374151',
-      },
-      timeScale: {
-        borderColor: '#374151',
-        timeVisible: true,
-        secondsVisible: false,
-      },
-    })
+    let isMounted = true
 
-    rsiChartRef.current = rsiChart
+    // Use requestAnimationFrame to ensure DOM is fully ready
+    const initializeRsiChart = () => {
+      requestAnimationFrame(() => {
+        if (!rsiChartContainerRef.current || !isMounted) return
 
-    // Mark RSI chart as ready after initialization
-    setIsRsiChartReady(true)
+        try {
+          // Create RSI chart
+          const rsiChart = createChart(rsiChartContainerRef.current, {
+            width: rsiChartContainerRef.current.clientWidth,
+            height: 150,
+            layout: {
+              background: { color: 'transparent' },
+              textColor: '#6b7280',
+            },
+            grid: {
+              vertLines: { color: '#374151' },
+              horzLines: { color: '#374151' },
+            },
+            rightPriceScale: {
+              borderColor: '#374151',
+            },
+            timeScale: {
+              borderColor: '#374151',
+              timeVisible: true,
+              secondsVisible: false,
+            },
+          })
+
+          rsiChartRef.current = rsiChart
+
+          // Mark RSI chart as ready after a small delay to ensure full initialization
+          setTimeout(() => {
+            if (isMounted) {
+              setIsRsiChartReady(true)
+            }
+          }, 50)
+        } catch (error) {
+          console.error('Error initializing RSI chart:', error)
+        }
+      })
+    }
+
+    initializeRsiChart()
 
     // Handle resize
     const handleResize = () => {
-      if (rsiChartContainerRef.current && rsiChart) {
-        rsiChart.applyOptions({ width: rsiChartContainerRef.current.clientWidth })
+      if (rsiChartContainerRef.current && rsiChartRef.current) {
+        rsiChartRef.current.applyOptions({ width: rsiChartContainerRef.current.clientWidth })
       }
     }
 
     window.addEventListener('resize', handleResize)
 
     return () => {
+      isMounted = false
       window.removeEventListener('resize', handleResize)
       setIsRsiChartReady(false)
-      rsiChart.remove()
+      if (rsiChartRef.current) {
+        try {
+          rsiChartRef.current.remove()
+        } catch (error) {
+          console.warn('Error removing RSI chart:', error)
+        }
+      }
       rsiChartRef.current = null
       rsiSeriesRef.current = null
     }
@@ -264,15 +316,20 @@ export default function Chart({ initialCoinId }: ChartProps) {
       return
     }
 
-    // Clear existing series
-    seriesRefs.current.forEach(series => {
-      try {
-        chartRef.current.removeSeries(series)
-      } catch (error) {
-        console.warn('Error removing series:', error)
-      }
-    })
-    seriesRefs.current.clear()
+    try {
+      // Clear existing series
+      seriesRefs.current.forEach(series => {
+        try {
+          chartRef.current.removeSeries(series)
+        } catch (error) {
+          console.warn('Error removing series:', error)
+        }
+      })
+      seriesRefs.current.clear()
+    } catch (error) {
+      console.error('Error clearing chart series:', error)
+      return
+    }
 
     // Add volume first (so it's in the background)
     if (activeIndicators.has('volume')) {
