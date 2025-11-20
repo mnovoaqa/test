@@ -135,27 +135,31 @@ export default function CryptoDetailPanel({ crypto }: CryptoDetailPanelProps) {
           <h4>Recent News</h4>
           <div className="news-list">
             {enhancedData.recentNews.map((article, index) => (
-              <a
-                key={index}
-                href={article.url}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="news-item"
-              >
-                <div className="news-header">
-                  <span className={`news-sentiment ${article.sentiment}`}>
-                    {article.sentiment === 'positive' ? '📈' : article.sentiment === 'negative' ? '📉' : '📊'}
-                  </span>
-                  <span className="news-source">{article.source}</span>
+              <div key={index} className="news-item-wrapper">
+                <div className="news-item-content">
+                  <div className="news-header">
+                    <span className={`news-sentiment ${article.sentiment}`}>
+                      {article.sentiment === 'positive' ? '📈' : article.sentiment === 'negative' ? '📉' : '📊'}
+                    </span>
+                    <span className="news-source">{article.source}</span>
+                  </div>
+                  <div className="news-title">{article.title}</div>
+                  <div className="news-description">{article.description}</div>
+                  <div className="news-meta">
+                    <span className="news-time">
+                      {new Date(article.publishedAt).toLocaleString()}
+                    </span>
+                  </div>
                 </div>
-                <div className="news-title">{article.title}</div>
-                <div className="news-description">{article.description}</div>
-                <div className="news-meta">
-                  <span className="news-time">
-                    {new Date(article.publishedAt).toLocaleString()}
-                  </span>
-                </div>
-              </a>
+                <a
+                  href={article.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="news-read-more-btn"
+                >
+                  Read Full Article →
+                </a>
+              </div>
             ))}
           </div>
         </div>

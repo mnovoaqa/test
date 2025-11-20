@@ -48,14 +48,23 @@ export default function Chart({ initialCoinId }: ChartProps) {
   const [chartType, setChartType] = useState<ChartType>('candlestick')
   const [activeIndicators, setActiveIndicators] = useState<Set<IndicatorType>>(new Set(['volume']))
 
+  const [indicatorStatus, setIndicatorStatus] = useState<string>('')
+
   const toggleIndicator = (indicator: IndicatorType) => {
     setActiveIndicators(prev => {
       const newSet = new Set(prev)
+
       if (newSet.has(indicator)) {
         newSet.delete(indicator)
+        setIndicatorStatus(`${indicator.toUpperCase()} removed from chart`)
       } else {
         newSet.add(indicator)
+        setIndicatorStatus(`${indicator.toUpperCase()} added to chart`)
       }
+
+      // Clear status after 2 seconds
+      setTimeout(() => setIndicatorStatus(''), 2000)
+
       return newSet
     })
   }
@@ -302,34 +311,40 @@ export default function Chart({ initialCoinId }: ChartProps) {
             className={`indicator-btn ${activeIndicators.has('volume') ? 'active' : ''}`}
             onClick={() => toggleIndicator('volume')}
           >
-            Volume
+            {activeIndicators.has('volume') ? '✓ ' : ''}Volume
           </button>
           <button
             className={`indicator-btn ${activeIndicators.has('sma') ? 'active' : ''}`}
             onClick={() => toggleIndicator('sma')}
           >
-            SMA(20)
+            {activeIndicators.has('sma') ? '✓ ' : ''}SMA(20)
           </button>
           <button
             className={`indicator-btn ${activeIndicators.has('ema') ? 'active' : ''}`}
             onClick={() => toggleIndicator('ema')}
           >
-            EMA(12)
+            {activeIndicators.has('ema') ? '✓ ' : ''}EMA(12)
           </button>
           <button
             className={`indicator-btn ${activeIndicators.has('bollinger') ? 'active' : ''}`}
             onClick={() => toggleIndicator('bollinger')}
           >
-            Bollinger Bands
+            {activeIndicators.has('bollinger') ? '✓ ' : ''}Bollinger Bands
           </button>
           <button
             className={`indicator-btn ${activeIndicators.has('rsi') ? 'active' : ''}`}
             onClick={() => toggleIndicator('rsi')}
           >
-            RSI
+            {activeIndicators.has('rsi') ? '✓ ' : ''}RSI
           </button>
         </div>
       </div>
+
+      {indicatorStatus && (
+        <div className="indicator-status-banner">
+          {indicatorStatus}
+        </div>
+      )}
 
       <div className="chart-wrapper">
         {!hasData ? (
@@ -511,7 +526,9 @@ export default function Chart({ initialCoinId }: ChartProps) {
       <div className="chart-info">
         <p className="info-text">
           <strong>Tip:</strong> Use the timeframe selector to adjust the candlestick interval.
-          Enable indicators to view technical analysis overlays on the chart.
+          Click indicator buttons to toggle them ON/OFF - watch for the ✓ checkmark and status banner.
+          {!hasData && ' The chart needs at least 10 data points to display.'}
+          {hasData && ` Currently showing ${chartData.length} candles with ${activeIndicators.size} active indicator(s).`}
         </p>
       </div>
     </div>
