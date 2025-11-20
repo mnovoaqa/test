@@ -10,6 +10,7 @@ import {
   Legend,
   ResponsiveContainer,
   ReferenceLine,
+  Customized,
 } from 'recharts'
 import { useCryptoStore } from '../stores/cryptoStore'
 import { alertService } from '../services/alertService'
@@ -146,37 +147,77 @@ export default function Chart({ initialCoinId }: ChartProps) {
 
   const hasData = chartData.length > 0
 
-  // Custom candlestick component
-  const Candlestick = (props: any) => {
-    const { x, y, width, height, payload } = props
-    const isGreen = payload.close >= payload.open
+  // Custom candlestick renderer using Recharts Customized component
+  const renderCandlesticks = (props: any) => {
+    const { xAxisMap, yAxisMap, offset, chartData: data } = props
 
-    if (!payload || !x || !width) return null
+    // Use the data passed as prop or fall back to the component's chartData
+    const dataToRender = data || chartData
 
-    const bodyHeight = Math.abs(payload.close - payload.open)
-    const bodyY = Math.min(payload.close, payload.open)
-    const wickHeight = payload.high - payload.low
+    if (!dataToRender || !xAxisMap || !yAxisMap) return null
+
+    const xAxis = Object.values(xAxisMap)[0] as any
+    const yAxis = yAxisMap.price as any
+
+    if (!xAxis || !yAxis) return null
+
+    // Calculate bandwidth for continuous scale
+    const calculateBandwidth = () => {
+      if (xAxis.scale.bandwidth) {
+        return xAxis.scale.bandwidth()
+      }
+      // For continuous scales, calculate based on data spacing
+      if (dataToRender.length < 2) return 10
+      const firstX = xAxis.scale(dataToRender[0].time)
+      const secondX = xAxis.scale(dataToRender[1].time)
+      return Math.abs(secondX - firstX) * 0.8
+    }
+
+    const baseBandwidth = calculateBandwidth()
 
     return (
-      <g>
-        {/* Wick */}
-        <line
-          x1={x + width / 2}
-          y1={y}
-          x2={x + width / 2}
-          y2={y + height}
-          stroke={isGreen ? '#26a69a' : '#ef5350'}
-          strokeWidth={1}
-        />
-        {/* Body */}
-        <rect
-          x={x}
-          y={y + ((payload.high - bodyY) / wickHeight) * height}
-          width={width}
-          height={Math.max(1, (bodyHeight / wickHeight) * height)}
-          fill={isGreen ? '#26a69a' : '#ef5350'}
-          stroke={isGreen ? '#26a69a' : '#ef5350'}
-        />
+      <g className="custom-candlesticks">
+        {dataToRender.map((entry: CandleData, index: number) => {
+          const x = xAxis.scale(entry.time) + offset.left
+          const bandwidth = baseBandwidth
+          const candleWidth = Math.max(bandwidth * 0.7, 2)
+
+          const highY = yAxis.scale(entry.high) + offset.top
+          const lowY = yAxis.scale(entry.low) + offset.top
+          const openY = yAxis.scale(entry.open) + offset.top
+          const closeY = yAxis.scale(entry.close) + offset.top
+
+          const isGreen = entry.close >= entry.open
+          const color = isGreen ? '#26a69a' : '#ef5350'
+
+          const bodyTop = Math.min(openY, closeY)
+          const bodyBottom = Math.max(openY, closeY)
+          const bodyHeight = Math.max(bodyBottom - bodyTop, 1)
+
+          return (
+            <g key={`candle-${index}`}>
+              {/* Wick */}
+              <line
+                x1={x + bandwidth / 2}
+                y1={highY}
+                x2={x + bandwidth / 2}
+                y2={lowY}
+                stroke={color}
+                strokeWidth={1}
+              />
+              {/* Body */}
+              <rect
+                x={x + (bandwidth - candleWidth) / 2}
+                y={bodyTop}
+                width={candleWidth}
+                height={bodyHeight}
+                fill={color}
+                stroke={color}
+                strokeWidth={1}
+              />
+            </g>
+          )
+        })}
       </g>
     )
   }
@@ -370,6 +411,9 @@ export default function Chart({ initialCoinId }: ChartProps) {
                     tickFormatter={formatTime}
                     stroke="var(--text-secondary)"
                     tick={{ fill: 'var(--text-secondary)' }}
+                    type="number"
+                    domain={['dataMin', 'dataMax']}
+                    scale="time"
                   />
                   <YAxis
                     yAxisId="price"
@@ -377,7 +421,16 @@ export default function Chart({ initialCoinId }: ChartProps) {
                     tickFormatter={formatPrice}
                     stroke="var(--text-secondary)"
                     tick={{ fill: 'var(--text-secondary)' }}
-                    domain={['auto', 'auto']}
+                    domain={[
+                      () => {
+                        const minLow = Math.min(...chartData.map(d => d.low))
+                        return minLow * 0.999
+                      },
+                      () => {
+                        const maxHigh = Math.max(...chartData.map(d => d.high))
+                        return maxHigh * 1.001
+                      }
+                    ]}
                   />
                   {activeIndicators.has('volume') && (
                     <YAxis
@@ -404,12 +457,7 @@ export default function Chart({ initialCoinId }: ChartProps) {
 
                   {/* Candlesticks or Line Chart */}
                   {chartType === 'candlestick' ? (
-                    <Bar
-                      yAxisId="price"
-                      dataKey="high"
-                      shape={<Candlestick />}
-                      name="Price"
-                    />
+                    <Customized component={renderCandlesticks} chartData={chartData} />
                   ) : (
                     <Line
                       yAxisId="price"
