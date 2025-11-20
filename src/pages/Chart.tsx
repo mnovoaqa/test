@@ -35,9 +35,14 @@ interface CandleData {
   rsi?: number
 }
 
-export default function Chart() {
+interface ChartProps {
+  initialCoinId?: string | null
+}
+
+export default function Chart({ initialCoinId }: ChartProps) {
   const { cryptoList } = useCryptoStore()
-  const [selectedCoin, setSelectedCoin] = useState<string>('bitcoin')
+  const [selectedCoin, setSelectedCoin] = useState<string>(initialCoinId || 'bitcoin')
+  const [searchQuery, setSearchQuery] = useState<string>('')
   const [timeframe, setTimeframe] = useState<Timeframe>('15m')
   const [activeIndicators, setActiveIndicators] = useState<Set<IndicatorType>>(new Set(['volume']))
 
@@ -57,6 +62,18 @@ export default function Chart() {
   const priceHistory = alertService.getPriceHistory(selectedCoin)
   const currentPrice = currentCoin?.current_price || 0
   const priceChange24h = currentCoin?.price_change_percentage_24h || 0
+
+  // Filter crypto list based on search query
+  const filteredCryptoList = useMemo(() => {
+    if (!searchQuery.trim()) return cryptoList.slice(0, 50)
+
+    const query = searchQuery.toLowerCase()
+    return cryptoList.filter(coin =>
+      coin.name.toLowerCase().includes(query) ||
+      coin.symbol.toLowerCase().includes(query) ||
+      coin.id.toLowerCase().includes(query)
+    ).slice(0, 20)
+  }, [cryptoList, searchQuery])
 
   // Calculate chart data with indicators
   const chartData = useMemo(() => {
@@ -207,13 +224,20 @@ export default function Chart() {
       <div className="chart-header">
         <div className="chart-title-section">
           <h2>Live Chart</h2>
-          <div className="coin-selector">
+          <div className="coin-search-container">
+            <input
+              type="text"
+              placeholder="Search cryptocurrency..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="coin-search-input"
+            />
             <select
               value={selectedCoin}
               onChange={(e) => setSelectedCoin(e.target.value)}
               className="coin-select"
             >
-              {cryptoList.slice(0, 50).map(coin => (
+              {filteredCryptoList.map(coin => (
                 <option key={coin.id} value={coin.id}>
                   {coin.symbol.toUpperCase()} - {coin.name}
                 </option>
@@ -306,27 +330,27 @@ export default function Chart() {
             <div className="chart-container">
               <ResponsiveContainer width="100%" height={500}>
                 <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#2b2b2b" />
+                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.5} />
                   <XAxis
                     dataKey="time"
                     tickFormatter={formatTime}
-                    stroke="#d1d4dc"
-                    tick={{ fill: '#d1d4dc' }}
+                    stroke="var(--text-secondary)"
+                    tick={{ fill: 'var(--text-secondary)' }}
                   />
                   <YAxis
                     yAxisId="price"
                     orientation="right"
                     tickFormatter={formatPrice}
-                    stroke="#d1d4dc"
-                    tick={{ fill: '#d1d4dc' }}
+                    stroke="var(--text-secondary)"
+                    tick={{ fill: 'var(--text-secondary)' }}
                     domain={['auto', 'auto']}
                   />
                   {activeIndicators.has('volume') && (
                     <YAxis
                       yAxisId="volume"
                       orientation="left"
-                      stroke="#d1d4dc"
-                      tick={{ fill: '#d1d4dc' }}
+                      stroke="var(--text-secondary)"
+                      tick={{ fill: 'var(--text-secondary)' }}
                       domain={[0, 'auto']}
                     />
                   )}
@@ -422,16 +446,16 @@ export default function Chart() {
                 <div className="rsi-label">RSI (14)</div>
                 <ResponsiveContainer width="100%" height={150}>
                   <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#2b2b2b" />
+                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.5} />
                     <XAxis
                       dataKey="time"
                       tickFormatter={formatTime}
-                      stroke="#d1d4dc"
-                      tick={{ fill: '#d1d4dc' }}
+                      stroke="var(--text-secondary)"
+                      tick={{ fill: 'var(--text-secondary)' }}
                     />
                     <YAxis
-                      stroke="#d1d4dc"
-                      tick={{ fill: '#d1d4dc' }}
+                      stroke="var(--text-secondary)"
+                      tick={{ fill: 'var(--text-secondary)' }}
                       domain={[0, 100]}
                     />
                     <Tooltip content={<CustomTooltip />} />

@@ -25,31 +25,62 @@
   font-size: 1.8rem;
 }
 
-.coin-selector {
+.coin-search-container {
   display: flex;
-  align-items: center;
-  gap: 0.5rem;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 300px;
+}
+
+.coin-search-input {
+  padding: 0.6rem 1rem;
+  background: var(--input-bg, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  border-radius: 8px;
+  color: var(--text-primary, rgba(255, 255, 255, 0.9));
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+}
+
+.coin-search-input:hover {
+  border-color: rgba(102, 126, 234, 0.4);
+}
+
+.coin-search-input:focus {
+  outline: none;
+  border-color: rgba(102, 126, 234, 0.6);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.coin-search-input::placeholder {
+  color: var(--text-tertiary, rgba(255, 255, 255, 0.5));
 }
 
 .coin-select {
-  padding: 0.5rem 1rem;
-  background: var(--card-bg);
-  border: 1px solid var(--border-color);
+  padding: 0.6rem 1rem;
+  background: var(--input-bg, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
   border-radius: 8px;
-  color: var(--text-primary);
-  font-size: 1rem;
+  color: var(--text-primary, rgba(255, 255, 255, 0.9));
+  font-size: 0.95rem;
   cursor: pointer;
   transition: all 0.2s ease;
 }
 
 .coin-select:hover {
-  border-color: var(--accent-blue);
+  border-color: rgba(102, 126, 234, 0.4);
 }
 
 .coin-select:focus {
   outline: none;
-  border-color: var(--accent-blue);
-  box-shadow: 0 0 0 3px rgba(33, 150, 243, 0.1);
+  border-color: rgba(102, 126, 234, 0.6);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.coin-select option {
+  background: var(--bg-gradient-1, #1a1a2e);
+  color: var(--text-primary, rgba(255, 255, 255, 0.9));
+  padding: 0.5rem;
 }
 
 .coin-info {
@@ -167,8 +198,9 @@
 .chart-container {
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
   margin-bottom: 1rem;
+  background: var(--surface, rgba(255, 255, 255, 0.05));
 }
 
 .chart-empty-state {
@@ -263,17 +295,20 @@
   position: relative;
   border-radius: 12px;
   overflow: hidden;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
   margin-top: 1rem;
+  background: var(--surface, rgba(255, 255, 255, 0.05));
 }
 
 .rsi-label {
   position: absolute;
   top: 10px;
   left: 10px;
-  background: rgba(0, 0, 0, 0.6);
+  background: var(--surface, rgba(0, 0, 0, 0.6));
+  backdrop-filter: blur(8px);
   padding: 0.25rem 0.75rem;
   border-radius: 6px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--text-primary);
@@ -300,11 +335,12 @@
 }
 
 .chart-tooltip {
-  background: rgba(26, 26, 26, 0.95);
-  border: 1px solid var(--border-color);
+  background: var(--surface, rgba(26, 26, 26, 0.95));
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
   border-radius: 8px;
   padding: 0.75rem 1rem;
-  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.3);
+  box-shadow: 0 4px 6px var(--shadow, rgba(0, 0, 0, 0.3));
 }
 
 .tooltip-time {

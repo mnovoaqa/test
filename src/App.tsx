@@ -12,6 +12,7 @@ type Page = 'dashboard' | 'watchlist' | 'chart' | 'alerts' | 'calculator' | 'set
 
 function App() {
   const [currentPage, setCurrentPage] = useState<Page>('dashboard')
+  const [selectedChartCoin, setSelectedChartCoin] = useState<string | null>(null)
   const { settings } = useCryptoStore()
 
   useEffect(() => {
@@ -19,14 +20,21 @@ function App() {
     document.documentElement.setAttribute('data-theme', settings.theme)
   }, [settings.theme])
 
+  const navigateToChart = (coinId?: string) => {
+    setCurrentPage('chart')
+    if (coinId) {
+      setSelectedChartCoin(coinId)
+    }
+  }
+
   const renderPage = () => {
     switch (currentPage) {
       case 'dashboard':
-        return <Dashboard />
+        return <Dashboard onNavigateToChart={navigateToChart} />
       case 'watchlist':
-        return <Watchlist />
+        return <Watchlist onNavigateToChart={navigateToChart} />
       case 'chart':
-        return <Chart />
+        return <Chart initialCoinId={selectedChartCoin} />
       case 'alerts':
         return <AlertHistory />
       case 'calculator':

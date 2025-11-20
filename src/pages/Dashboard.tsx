@@ -2,7 +2,11 @@ import { useEffect, useState, useMemo } from 'react'
 import { useCryptoStore } from '../stores/cryptoStore'
 import CryptoCard from '../components/CryptoCard'
 
-export default function Dashboard() {
+interface DashboardProps {
+  onNavigateToChart?: (coinId: string) => void
+}
+
+export default function Dashboard({ onNavigateToChart }: DashboardProps) {
   const {
     cryptoList,
     loading,
@@ -184,7 +188,11 @@ export default function Dashboard() {
       ) : (
         <div className={`crypto-${viewMode}`}>
           {filteredAndSortedList.map((crypto) => (
-            <CryptoCard key={crypto.id} crypto={crypto} />
+            <CryptoCard
+              key={crypto.id}
+              crypto={crypto}
+              onNavigateToChart={onNavigateToChart}
+            />
           ))}
         </div>
       )}

@@ -4,9 +4,10 @@ import { useCryptoStore } from '../stores/cryptoStore'
 
 interface CryptoCardProps {
   crypto: CryptoData
+  onNavigateToChart?: (coinId: string) => void
 }
 
-export default function CryptoCard({ crypto }: CryptoCardProps) {
+export default function CryptoCard({ crypto, onNavigateToChart }: CryptoCardProps) {
   const { setSelectedCoin, toggleFavorite, settings, addCoinToWatchlist, removeCoinFromWatchlist } = useCryptoStore()
   const isFavorite = settings.favoriteCoins.includes(crypto.id)
   const [showWatchlistMenu, setShowWatchlistMenu] = useState(false)
@@ -63,10 +64,18 @@ export default function CryptoCard({ crypto }: CryptoCardProps) {
     }
   }
 
+  const handleCardClick = () => {
+    if (onNavigateToChart) {
+      onNavigateToChart(crypto.id)
+    } else {
+      setSelectedCoin(crypto)
+    }
+  }
+
   return (
     <div
       className={`crypto-card ${isPositive ? 'positive' : 'negative'}`}
-      onClick={() => setSelectedCoin(crypto)}
+      onClick={handleCardClick}
     >
       <div className="crypto-header">
         <div className="crypto-info">

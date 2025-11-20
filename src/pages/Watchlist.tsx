@@ -3,7 +3,11 @@ import { useCryptoStore } from '../stores/cryptoStore'
 import CryptoCard from '../components/CryptoCard'
 import type { Watchlist as WatchlistType } from '../types/crypto'
 
-export default function Watchlist() {
+interface WatchlistProps {
+  onNavigateToChart?: (coinId: string) => void
+}
+
+export default function Watchlist({ onNavigateToChart }: WatchlistProps) {
   const { cryptoList, settings, addToWatchlist, removeFromWatchlist } = useCryptoStore()
   const [selectedWatchlist, setSelectedWatchlist] = useState<string | null>(
     settings.watchlists[0]?.id || null
@@ -131,7 +135,11 @@ export default function Watchlist() {
             {watchlistCoins.length > 0 ? (
               <div className="crypto-grid">
                 {watchlistCoins.map((crypto) => (
-                  <CryptoCard key={crypto.id} crypto={crypto} />
+                  <CryptoCard
+                    key={crypto.id}
+                    crypto={crypto}
+                    onNavigateToChart={onNavigateToChart}
+                  />
                 ))}
               </div>
             ) : (
