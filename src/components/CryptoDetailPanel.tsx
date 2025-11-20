@@ -66,23 +66,7 @@ export default function CryptoDetailPanel({ crypto }: CryptoDetailPanelProps) {
     }
   }, [crypto.id])
 
-  if (loading) {
-    return (
-      <div className="crypto-detail-panel loading">
-        <div className="loading-spinner"></div>
-        <p>Loading details...</p>
-      </div>
-    )
-  }
-
-  if (!enhancedData) {
-    return null
-  }
-
-  const sentimentIndicator = enhancedCryptoService.getSentimentIndicator(enhancedData.sentiment)
-  const athInfo = enhancedCryptoService.formatATHDistance(crypto.current_price, crypto.ath)
-  const predictiveSummary = enhancedCryptoService.getPredictiveSignalSummary(enhancedData.predictiveSignals)
-
+  // ALL HOOKS MUST BE CALLED BEFORE ANY CONDITIONAL RETURNS
   // Generate price prediction trend
   const predictionData = useMemo(() => {
     if (priceHistory.length < 20) return null
@@ -171,6 +155,24 @@ export default function CryptoDetailPanel({ crypto }: CryptoDetailPanelProps) {
       }
     ]
   }, [predictionData])
+
+  // NOW safe to do conditional returns - all hooks have been called
+  if (loading) {
+    return (
+      <div className="crypto-detail-panel loading">
+        <div className="loading-spinner"></div>
+        <p>Loading details...</p>
+      </div>
+    )
+  }
+
+  if (!enhancedData) {
+    return null
+  }
+
+  const sentimentIndicator = enhancedCryptoService.getSentimentIndicator(enhancedData.sentiment)
+  const athInfo = enhancedCryptoService.formatATHDistance(crypto.current_price, crypto.ath)
+  const predictiveSummary = enhancedCryptoService.getPredictiveSignalSummary(enhancedData.predictiveSignals)
 
   return (
     <div className="crypto-detail-panel">
