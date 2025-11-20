@@ -8,7 +8,7 @@ import type {
   TechnicalIndicators,
 } from '../types/crypto'
 import { coinGeckoService } from '../services/coinGeckoService'
-import { binanceWebSocket } from '../services/binanceWebSocket'
+import { cryptoPricePoller } from '../services/cryptoPricePoller'
 import { alertService } from '../services/alertService'
 import { notificationService } from '../services/notificationService'
 import { TechnicalIndicatorsCalculator } from '../services/technicalIndicators'
@@ -83,9 +83,9 @@ export const useCryptoStore = create<CryptoStore>((set, get) => ({
     try {
       const data = await coinGeckoService.getTop100Cryptocurrencies()
 
-      // Subscribe to WebSocket updates for all coins
+      // Subscribe to price polling updates for all coins
       data.forEach((coin) => {
-        binanceWebSocket.subscribe(coin.symbol, (priceData) => {
+        cryptoPricePoller.subscribe(coin.symbol, coin.id, (priceData) => {
           get().updateCryptoPrice(coin.id, priceData.price, priceData.volume)
         })
 
@@ -113,7 +113,7 @@ export const useCryptoStore = create<CryptoStore>((set, get) => ({
     }
   },
 
-  // Update cryptocurrency price from WebSocket
+  // Update cryptocurrency price from polling service
   updateCryptoPrice: (coinId: string, price: number, volume: number) => {
     set((state) => {
       const cryptoList = state.cryptoList.map((coin) => {
