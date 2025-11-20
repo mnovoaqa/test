@@ -1,6 +1,7 @@
 import { useState } from 'react'
 import type { CryptoData } from '../types/crypto'
 import { useCryptoStore } from '../stores/cryptoStore'
+import CryptoDetailPanel from './CryptoDetailPanel'
 
 interface CryptoCardProps {
   crypto: CryptoData
@@ -11,6 +12,7 @@ export default function CryptoCard({ crypto, onNavigateToChart }: CryptoCardProp
   const { setSelectedCoin, toggleFavorite, settings, addCoinToWatchlist, removeCoinFromWatchlist } = useCryptoStore()
   const isFavorite = settings.favoriteCoins.includes(crypto.id)
   const [showWatchlistMenu, setShowWatchlistMenu] = useState(false)
+  const [isExpanded, setIsExpanded] = useState(false)
 
   const priceChange = crypto.price_change_percentage_24h
   const isPositive = priceChange >= 0
@@ -65,6 +67,11 @@ export default function CryptoCard({ crypto, onNavigateToChart }: CryptoCardProp
   }
 
   const handleCardClick = () => {
+    setIsExpanded(!isExpanded)
+  }
+
+  const handleViewChart = (e: React.MouseEvent) => {
+    e.stopPropagation()
     if (onNavigateToChart) {
       onNavigateToChart(crypto.id)
     } else {
@@ -171,6 +178,18 @@ export default function CryptoCard({ crypto, onNavigateToChart }: CryptoCardProp
       </div>
 
       <div className="crypto-rank">#{crypto.market_cap_rank}</div>
+
+      {/* View Chart Button */}
+      <button className="view-chart-btn" onClick={handleViewChart}>
+        {isExpanded ? '📊 View Live Chart' : '📊 View Chart'}
+      </button>
+
+      {/* Expandable Detail Panel */}
+      {isExpanded && (
+        <div className="crypto-card-expanded">
+          <CryptoDetailPanel crypto={crypto} />
+        </div>
+      )}
     </div>
   )
 }
