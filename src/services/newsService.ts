@@ -95,28 +95,16 @@ class NewsService {
 
   /**
    * Fetch from CryptoPanic API
+   * Note: Direct browser calls are blocked by CORS. This would need a backend proxy.
    */
-  private async fetchFromCryptoPanic(coinSymbol: string): Promise<Omit<NewsArticle, 'coinId' | 'coinSymbol' | 'sentiment' | 'sentimentScore' | 'relevanceScore'>[]> {
-    try {
-      // CryptoPanic free API endpoint (no auth required for public feed)
-      const response = await axios.get(`https://cryptopanic.com/api/v1/posts/?currencies=${coinSymbol}&public=true`, {
-        timeout: 5000
-      })
+  private async fetchFromCryptoPanic(_coinSymbol: string): Promise<Omit<NewsArticle, 'coinId' | 'coinSymbol' | 'sentiment' | 'sentimentScore' | 'relevanceScore'>[]> {
+    // CORS blocks direct API calls from browser
+    // To enable this, you would need to:
+    // 1. Set up a backend proxy server
+    // 2. Get a CryptoPanic API key
+    // 3. Make requests through your backend
 
-      if (response.data && response.data.results) {
-        return response.data.results.map((item: any) => ({
-          id: item.id || `cp-${Date.now()}-${Math.random()}`,
-          title: item.title,
-          description: item.title, // CryptoPanic doesn't provide separate descriptions
-          url: item.url,
-          source: item.source?.title || 'CryptoPanic',
-          publishedAt: item.published_at || new Date().toISOString()
-        }))
-      }
-    } catch (error) {
-      // Fail silently and try other sources
-    }
-
+    // For now, returning empty array to use mock data instead
     return []
   }
 

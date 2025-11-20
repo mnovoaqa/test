@@ -241,6 +241,12 @@ export default function Chart({ initialCoinId }: ChartProps) {
   useEffect(() => {
     if (!chartRef.current || !hasData) return
 
+    // Safety check: ensure chart methods exist
+    if (typeof chartRef.current.addCandlestickSeries !== 'function') {
+      console.error('Chart API methods not available. Chart may not be properly initialized.')
+      return
+    }
+
     // Clear existing series
     seriesRefs.current.forEach(series => {
       chartRef.current.removeSeries(series)
@@ -249,26 +255,30 @@ export default function Chart({ initialCoinId }: ChartProps) {
 
     // Add volume first (so it's in the background)
     if (activeIndicators.has('volume')) {
-      const volumeSeries = chartRef.current.addHistogramSeries({
-        color: '#26a69a',
-        priceFormat: {
-          type: 'volume',
-        },
-        priceScaleId: 'volume',
-      })
-      volumeSeries.priceScale().applyOptions({
-        scaleMargins: {
-          top: 0.8,
-          bottom: 0,
-        },
-      })
-      const volumeData = chartData.map(d => ({
-        time: d.time as UTCTimestamp,
-        value: d.volume,
-        color: d.close >= d.open ? '#26a69a80' : '#ef535080',
-      }))
-      volumeSeries.setData(volumeData)
-      seriesRefs.current.set('volume', volumeSeries)
+      try {
+        const volumeSeries = chartRef.current.addHistogramSeries({
+          color: '#26a69a',
+          priceFormat: {
+            type: 'volume',
+          },
+          priceScaleId: 'volume',
+        })
+        volumeSeries.priceScale().applyOptions({
+          scaleMargins: {
+            top: 0.8,
+            bottom: 0,
+          },
+        })
+        const volumeData = chartData.map(d => ({
+          time: d.time as UTCTimestamp,
+          value: d.volume,
+          color: d.close >= d.open ? '#26a69a80' : '#ef535080',
+        }))
+        volumeSeries.setData(volumeData)
+        seriesRefs.current.set('volume', volumeSeries)
+      } catch (error) {
+        console.error('Error adding volume series:', error)
+      }
     }
 
     // Add main price series (candlestick or line)
