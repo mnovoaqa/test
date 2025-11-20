@@ -1,17 +1,6 @@
-import { useState, useMemo } from 'react'
-import {
-  ComposedChart,
-  Bar,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  Legend,
-  ResponsiveContainer,
-  ReferenceLine,
-  Customized,
-} from 'recharts'
+import { useState, useMemo, useEffect, useRef } from 'react'
+import { createChart } from 'lightweight-charts'
+import type { UTCTimestamp } from 'lightweight-charts'
 import { useCryptoStore } from '../stores/cryptoStore'
 import { alertService } from '../services/alertService'
 import { TechnicalIndicatorsCalculator } from '../services/technicalIndicators'
@@ -50,6 +39,14 @@ export default function Chart({ initialCoinId }: ChartProps) {
   const [activeIndicators, setActiveIndicators] = useState<Set<IndicatorType>>(new Set(['volume']))
 
   const [indicatorStatus, setIndicatorStatus] = useState<string>('')
+
+  const chartContainerRef = useRef<HTMLDivElement>(null)
+  const chartRef = useRef<any>(null)
+  const seriesRefs = useRef<Map<string, any>>(new Map())
+
+  const rsiChartContainerRef = useRef<HTMLDivElement>(null)
+  const rsiChartRef = useRef<any>(null)
+  const rsiSeriesRef = useRef<any>(null)
 
   const toggleIndicator = (indicator: IndicatorType) => {
     setActiveIndicators(prev => {
@@ -147,130 +144,288 @@ export default function Chart({ initialCoinId }: ChartProps) {
 
   const hasData = chartData.length > 0
 
-  // Custom candlestick renderer using Recharts Customized component
-  const renderCandlesticks = (props: any) => {
-    const { xAxisMap, yAxisMap, offset, chartData: data } = props
+  // Initialize main chart
+  useEffect(() => {
+    if (!chartContainerRef.current || !hasData) return
 
-    // Use the data passed as prop or fall back to the component's chartData
-    const dataToRender = data || chartData
+    // Create chart
+    const chart = createChart(chartContainerRef.current, {
+      width: chartContainerRef.current.clientWidth,
+      height: 500,
+      layout: {
+        background: { color: 'transparent' },
+        textColor: '#6b7280',
+      },
+      grid: {
+        vertLines: { color: '#374151' },
+        horzLines: { color: '#374151' },
+      },
+      crosshair: {
+        mode: 1,
+      },
+      rightPriceScale: {
+        borderColor: '#374151',
+      },
+      timeScale: {
+        borderColor: '#374151',
+        timeVisible: true,
+        secondsVisible: false,
+      },
+    })
 
-    if (!dataToRender || !xAxisMap || !yAxisMap) return null
+    chartRef.current = chart
 
-    const xAxis = Object.values(xAxisMap)[0] as any
-    const yAxis = yAxisMap.price as any
-
-    if (!xAxis || !yAxis) return null
-
-    // Calculate bandwidth for continuous scale
-    const calculateBandwidth = () => {
-      if (xAxis.scale.bandwidth) {
-        return xAxis.scale.bandwidth()
+    // Handle resize
+    const handleResize = () => {
+      if (chartContainerRef.current) {
+        chart.applyOptions({ width: chartContainerRef.current.clientWidth })
       }
-      // For continuous scales, calculate based on data spacing
-      if (dataToRender.length < 2) return 10
-      const firstX = xAxis.scale(dataToRender[0].time)
-      const secondX = xAxis.scale(dataToRender[1].time)
-      return Math.abs(secondX - firstX) * 0.8
     }
 
-    const baseBandwidth = calculateBandwidth()
+    window.addEventListener('resize', handleResize)
 
-    return (
-      <g className="custom-candlesticks">
-        {dataToRender.map((entry: CandleData, index: number) => {
-          const x = xAxis.scale(entry.time) + offset.left
-          const bandwidth = baseBandwidth
-          const candleWidth = Math.max(bandwidth * 0.7, 2)
-
-          const highY = yAxis.scale(entry.high) + offset.top
-          const lowY = yAxis.scale(entry.low) + offset.top
-          const openY = yAxis.scale(entry.open) + offset.top
-          const closeY = yAxis.scale(entry.close) + offset.top
-
-          const isGreen = entry.close >= entry.open
-          const color = isGreen ? '#26a69a' : '#ef5350'
-
-          const bodyTop = Math.min(openY, closeY)
-          const bodyBottom = Math.max(openY, closeY)
-          const bodyHeight = Math.max(bodyBottom - bodyTop, 1)
-
-          return (
-            <g key={`candle-${index}`}>
-              {/* Wick */}
-              <line
-                x1={x + bandwidth / 2}
-                y1={highY}
-                x2={x + bandwidth / 2}
-                y2={lowY}
-                stroke={color}
-                strokeWidth={1}
-              />
-              {/* Body */}
-              <rect
-                x={x + (bandwidth - candleWidth) / 2}
-                y={bodyTop}
-                width={candleWidth}
-                height={bodyHeight}
-                fill={color}
-                stroke={color}
-                strokeWidth={1}
-              />
-            </g>
-          )
-        })}
-      </g>
-    )
-  }
-
-  // Custom tooltip
-  const CustomTooltip = ({ active, payload }: any) => {
-    if (active && payload && payload.length) {
-      const data = payload[0].payload as CandleData
-      return (
-        <div className="chart-tooltip">
-          <p className="tooltip-time">{data.timeStr}</p>
-          <p className="tooltip-item">O: <span>${data.open.toFixed(8)}</span></p>
-          <p className="tooltip-item">H: <span>${data.high.toFixed(8)}</span></p>
-          <p className="tooltip-item">L: <span>${data.low.toFixed(8)}</span></p>
-          <p className="tooltip-item">C: <span>${data.close.toFixed(8)}</span></p>
-          {activeIndicators.has('volume') && (
-            <p className="tooltip-item">Vol: <span>{data.volume.toFixed(2)}</span></p>
-          )}
-          {activeIndicators.has('sma') && data.sma && (
-            <p className="tooltip-item" style={{ color: '#2196F3' }}>SMA(20): <span>${data.sma.toFixed(8)}</span></p>
-          )}
-          {activeIndicators.has('ema') && data.ema && (
-            <p className="tooltip-item" style={{ color: '#FF6B35' }}>EMA(12): <span>${data.ema.toFixed(8)}</span></p>
-          )}
-          {activeIndicators.has('rsi') && data.rsi && (
-            <p className="tooltip-item" style={{ color: '#2962FF' }}>RSI: <span>{data.rsi.toFixed(2)}</span></p>
-          )}
-        </div>
-      )
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      chart.remove()
+      chartRef.current = null
+      seriesRefs.current.clear()
     }
-    return null
-  }
+  }, [hasData])
 
-  // Format price for Y-axis
-  const formatPrice = (value: number) => {
-    if (value < 0.01) return value.toFixed(8)
-    if (value < 1) return value.toFixed(6)
-    if (value < 100) return value.toFixed(4)
-    return value.toFixed(2)
-  }
+  // Initialize RSI chart
+  useEffect(() => {
+    if (!rsiChartContainerRef.current || !hasData || !activeIndicators.has('rsi')) return
 
-  // Format time for X-axis
-  const formatTime = (value: number) => {
-    const date = new Date(value * 1000)
-    if (timeframe === '1m' || timeframe === '5m' || timeframe === '15m' || timeframe === '1h') {
-      return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    } else if (timeframe === '4h' || timeframe === '1d' || timeframe === '7d') {
-      return date.toLocaleDateString([], { month: 'short', day: 'numeric' })
+    // Create RSI chart
+    const rsiChart = createChart(rsiChartContainerRef.current, {
+      width: rsiChartContainerRef.current.clientWidth,
+      height: 150,
+      layout: {
+        background: { color: 'transparent' },
+        textColor: '#6b7280',
+      },
+      grid: {
+        vertLines: { color: '#374151' },
+        horzLines: { color: '#374151' },
+      },
+      rightPriceScale: {
+        borderColor: '#374151',
+      },
+      timeScale: {
+        borderColor: '#374151',
+        timeVisible: true,
+        secondsVisible: false,
+      },
+    })
+
+    rsiChartRef.current = rsiChart
+
+    // Handle resize
+    const handleResize = () => {
+      if (rsiChartContainerRef.current) {
+        rsiChart.applyOptions({ width: rsiChartContainerRef.current.clientWidth })
+      }
+    }
+
+    window.addEventListener('resize', handleResize)
+
+    return () => {
+      window.removeEventListener('resize', handleResize)
+      rsiChart.remove()
+      rsiChartRef.current = null
+      rsiSeriesRef.current = null
+    }
+  }, [hasData, activeIndicators])
+
+  // Update chart data
+  useEffect(() => {
+    if (!chartRef.current || !hasData) return
+
+    // Clear existing series
+    seriesRefs.current.forEach(series => {
+      chartRef.current.removeSeries(series)
+    })
+    seriesRefs.current.clear()
+
+    // Add volume first (so it's in the background)
+    if (activeIndicators.has('volume')) {
+      const volumeSeries = chartRef.current.addHistogramSeries({
+        color: '#26a69a',
+        priceFormat: {
+          type: 'volume',
+        },
+        priceScaleId: 'volume',
+      })
+      volumeSeries.priceScale().applyOptions({
+        scaleMargins: {
+          top: 0.8,
+          bottom: 0,
+        },
+      })
+      const volumeData = chartData.map(d => ({
+        time: d.time as UTCTimestamp,
+        value: d.volume,
+        color: d.close >= d.open ? '#26a69a80' : '#ef535080',
+      }))
+      volumeSeries.setData(volumeData)
+      seriesRefs.current.set('volume', volumeSeries)
+    }
+
+    // Add main price series (candlestick or line)
+    if (chartType === 'candlestick') {
+      const candlestickSeries = chartRef.current.addCandlestickSeries({
+        upColor: '#26a69a',
+        downColor: '#ef5350',
+        borderUpColor: '#26a69a',
+        borderDownColor: '#ef5350',
+        wickUpColor: '#26a69a',
+        wickDownColor: '#ef5350',
+      })
+      const candleData = chartData.map(d => ({
+        time: d.time as UTCTimestamp,
+        open: d.open,
+        high: d.high,
+        low: d.low,
+        close: d.close,
+      }))
+      candlestickSeries.setData(candleData)
+      seriesRefs.current.set('candlestick', candlestickSeries)
     } else {
-      // For 30d, 90d, 1y show month and year
-      return date.toLocaleDateString([], { month: 'short', year: '2-digit' })
+      const lineSeries = chartRef.current.addLineSeries({
+        color: '#2196F3',
+        lineWidth: 2,
+      })
+      const lineData = chartData.map(d => ({
+        time: d.time as UTCTimestamp,
+        value: d.close,
+      }))
+      lineSeries.setData(lineData)
+      seriesRefs.current.set('line', lineSeries)
     }
-  }
+
+    // Add SMA
+    if (activeIndicators.has('sma')) {
+      const smaSeries = chartRef.current.addLineSeries({
+        color: '#2196F3',
+        lineWidth: 2,
+        title: 'SMA(20)',
+      })
+      const smaData = chartData
+        .filter(d => d.sma !== undefined)
+        .map(d => ({
+          time: d.time as UTCTimestamp,
+          value: d.sma!,
+        }))
+      smaSeries.setData(smaData)
+      seriesRefs.current.set('sma', smaSeries)
+    }
+
+    // Add EMA
+    if (activeIndicators.has('ema')) {
+      const emaSeries = chartRef.current.addLineSeries({
+        color: '#FF6B35',
+        lineWidth: 2,
+        title: 'EMA(12)',
+      })
+      const emaData = chartData
+        .filter(d => d.ema !== undefined)
+        .map(d => ({
+          time: d.time as UTCTimestamp,
+          value: d.ema!,
+        }))
+      emaSeries.setData(emaData)
+      seriesRefs.current.set('ema', emaSeries)
+    }
+
+    // Add Bollinger Bands
+    if (activeIndicators.has('bollinger')) {
+      const bbUpperSeries = chartRef.current.addLineSeries({
+        color: '#9C27B0',
+        lineWidth: 1,
+        lineStyle: 2, // dashed
+        title: 'BB Upper',
+      })
+      const bbMiddleSeries = chartRef.current.addLineSeries({
+        color: '#9C27B0',
+        lineWidth: 1,
+        title: 'BB Middle',
+      })
+      const bbLowerSeries = chartRef.current.addLineSeries({
+        color: '#9C27B0',
+        lineWidth: 1,
+        lineStyle: 2, // dashed
+        title: 'BB Lower',
+      })
+
+      const bbUpperData = chartData
+        .filter(d => d.bbUpper !== undefined)
+        .map(d => ({
+          time: d.time as UTCTimestamp,
+          value: d.bbUpper!,
+        }))
+      const bbMiddleData = chartData
+        .filter(d => d.bbMiddle !== undefined)
+        .map(d => ({
+          time: d.time as UTCTimestamp,
+          value: d.bbMiddle!,
+        }))
+      const bbLowerData = chartData
+        .filter(d => d.bbLower !== undefined)
+        .map(d => ({
+          time: d.time as UTCTimestamp,
+          value: d.bbLower!,
+        }))
+
+      bbUpperSeries.setData(bbUpperData)
+      bbMiddleSeries.setData(bbMiddleData)
+      bbLowerSeries.setData(bbLowerData)
+
+      seriesRefs.current.set('bbUpper', bbUpperSeries)
+      seriesRefs.current.set('bbMiddle', bbMiddleSeries)
+      seriesRefs.current.set('bbLower', bbLowerSeries)
+    }
+
+    // Fit content
+    chartRef.current.timeScale().fitContent()
+
+  }, [chartData, chartType, activeIndicators, hasData])
+
+  // Update RSI chart data
+  useEffect(() => {
+    if (!rsiChartRef.current || !hasData || !activeIndicators.has('rsi')) return
+
+    // Clear existing RSI series
+    if (rsiSeriesRef.current) {
+      rsiChartRef.current.removeSeries(rsiSeriesRef.current)
+      rsiSeriesRef.current = null
+    }
+
+    // Add RSI line
+    const rsiSeries = rsiChartRef.current.addLineSeries({
+      color: '#2962FF',
+      lineWidth: 2,
+      title: 'RSI(14)',
+    })
+
+    const rsiData = chartData
+      .filter(d => d.rsi !== undefined)
+      .map(d => ({
+        time: d.time as UTCTimestamp,
+        value: d.rsi!,
+      }))
+
+    rsiSeries.setData(rsiData)
+    rsiSeriesRef.current = rsiSeries
+
+    // Set price scale options for RSI (0-100 range)
+    rsiSeries.priceScale().applyOptions({
+      autoScale: false,
+    })
+
+    // Fit content
+    rsiChartRef.current.timeScale().fitContent()
+
+  }, [chartData, hasData, activeIndicators])
 
   return (
     <div className="chart-page">
@@ -302,11 +457,11 @@ export default function Chart({ initialCoinId }: ChartProps) {
         {currentCoin && (
           <div className="coin-info">
             <div className="coin-price">
-              <span className="price-label">Price:</span>
+              <span className="price-label">PRICE:</span>
               <span className="price-value">${currentPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 8 })}</span>
             </div>
             <div className={`coin-change ${priceChange24h >= 0 ? 'positive' : 'negative'}`}>
-              <span className="change-label">24h:</span>
+              <span className="change-label">24H:</span>
               <span className="change-value">{priceChange24h >= 0 ? '+' : ''}{priceChange24h.toFixed(2)}%</span>
             </div>
             <div className="data-points">
@@ -403,168 +558,14 @@ export default function Chart({ initialCoinId }: ChartProps) {
         ) : (
           <>
             <div className="chart-container">
-              <ResponsiveContainer width="100%" height={500}>
-                <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.5} />
-                  <XAxis
-                    dataKey="time"
-                    tickFormatter={formatTime}
-                    stroke="var(--text-secondary)"
-                    tick={{ fill: 'var(--text-secondary)' }}
-                    type="number"
-                    domain={['dataMin', 'dataMax']}
-                    scale="time"
-                  />
-                  <YAxis
-                    yAxisId="price"
-                    orientation="right"
-                    tickFormatter={formatPrice}
-                    stroke="var(--text-secondary)"
-                    tick={{ fill: 'var(--text-secondary)' }}
-                    domain={[
-                      () => {
-                        const minLow = Math.min(...chartData.map(d => d.low))
-                        return minLow * 0.999
-                      },
-                      () => {
-                        const maxHigh = Math.max(...chartData.map(d => d.high))
-                        return maxHigh * 1.001
-                      }
-                    ]}
-                  />
-                  {activeIndicators.has('volume') && (
-                    <YAxis
-                      yAxisId="volume"
-                      orientation="left"
-                      stroke="var(--text-secondary)"
-                      tick={{ fill: 'var(--text-secondary)' }}
-                      domain={[0, 'auto']}
-                    />
-                  )}
-                  <Tooltip content={<CustomTooltip />} />
-                  <Legend />
-
-                  {/* Volume bars */}
-                  {activeIndicators.has('volume') && (
-                    <Bar
-                      yAxisId="volume"
-                      dataKey="volume"
-                      fill="#26a69a"
-                      opacity={0.3}
-                      name="Volume"
-                    />
-                  )}
-
-                  {/* Candlesticks or Line Chart */}
-                  {chartType === 'candlestick' ? (
-                    <Customized component={renderCandlesticks} chartData={chartData} />
-                  ) : (
-                    <Line
-                      yAxisId="price"
-                      type="monotone"
-                      dataKey="close"
-                      stroke="#2196F3"
-                      strokeWidth={2}
-                      dot={false}
-                      name="Price"
-                    />
-                  )}
-
-                  {/* Bollinger Bands */}
-                  {activeIndicators.has('bollinger') && (
-                    <>
-                      <Line
-                        yAxisId="price"
-                        type="monotone"
-                        dataKey="bbUpper"
-                        stroke="#9C27B0"
-                        strokeWidth={1}
-                        strokeDasharray="5 5"
-                        dot={false}
-                        name="BB Upper"
-                      />
-                      <Line
-                        yAxisId="price"
-                        type="monotone"
-                        dataKey="bbMiddle"
-                        stroke="#9C27B0"
-                        strokeWidth={1}
-                        dot={false}
-                        name="BB Middle"
-                      />
-                      <Line
-                        yAxisId="price"
-                        type="monotone"
-                        dataKey="bbLower"
-                        stroke="#9C27B0"
-                        strokeWidth={1}
-                        strokeDasharray="5 5"
-                        dot={false}
-                        name="BB Lower"
-                      />
-                    </>
-                  )}
-
-                  {/* SMA */}
-                  {activeIndicators.has('sma') && (
-                    <Line
-                      yAxisId="price"
-                      type="monotone"
-                      dataKey="sma"
-                      stroke="#2196F3"
-                      strokeWidth={2}
-                      dot={false}
-                      name="SMA(20)"
-                    />
-                  )}
-
-                  {/* EMA */}
-                  {activeIndicators.has('ema') && (
-                    <Line
-                      yAxisId="price"
-                      type="monotone"
-                      dataKey="ema"
-                      stroke="#FF6B35"
-                      strokeWidth={2}
-                      dot={false}
-                      name="EMA(12)"
-                    />
-                  )}
-                </ComposedChart>
-              </ResponsiveContainer>
+              <div ref={chartContainerRef} className="lightweight-chart" />
             </div>
 
             {/* RSI Chart */}
             {activeIndicators.has('rsi') && (
               <div className="rsi-container">
                 <div className="rsi-label">RSI (14)</div>
-                <ResponsiveContainer width="100%" height={150}>
-                  <ComposedChart data={chartData} margin={{ top: 10, right: 30, left: 0, bottom: 0 }}>
-                    <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" opacity={0.5} />
-                    <XAxis
-                      dataKey="time"
-                      tickFormatter={formatTime}
-                      stroke="var(--text-secondary)"
-                      tick={{ fill: 'var(--text-secondary)' }}
-                    />
-                    <YAxis
-                      stroke="var(--text-secondary)"
-                      tick={{ fill: 'var(--text-secondary)' }}
-                      domain={[0, 100]}
-                    />
-                    <Tooltip content={<CustomTooltip />} />
-                    <ReferenceLine y={70} stroke="#ef5350" strokeDasharray="3 3" label="Overbought" />
-                    <ReferenceLine y={30} stroke="#26a69a" strokeDasharray="3 3" label="Oversold" />
-                    <Line
-                      type="monotone"
-                      dataKey="rsi"
-                      stroke="#2962FF"
-                      strokeWidth={2}
-                      dot={false}
-                      name="RSI"
-                    />
-                  </ComposedChart>
-                </ResponsiveContainer>
+                <div ref={rsiChartContainerRef} className="lightweight-chart" />
               </div>
             )}
           </>
