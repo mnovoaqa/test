@@ -39,6 +39,8 @@ export default function Chart({ initialCoinId }: ChartProps) {
   const [activeIndicators, setActiveIndicators] = useState<Set<IndicatorType>>(new Set(['volume']))
 
   const [indicatorStatus, setIndicatorStatus] = useState<string>('')
+  const [isChartReady, setIsChartReady] = useState(false)
+  const [isRsiChartReady, setIsRsiChartReady] = useState(false)
 
   const chartContainerRef = useRef<HTMLDivElement>(null)
   const chartRef = useRef<any>(null)
@@ -146,7 +148,10 @@ export default function Chart({ initialCoinId }: ChartProps) {
 
   // Initialize main chart
   useEffect(() => {
-    if (!chartContainerRef.current || !hasData) return
+    if (!chartContainerRef.current || !hasData) {
+      setIsChartReady(false)
+      return
+    }
 
     // Create chart
     const chart = createChart(chartContainerRef.current, {
@@ -175,9 +180,12 @@ export default function Chart({ initialCoinId }: ChartProps) {
 
     chartRef.current = chart
 
+    // Mark chart as ready after initialization
+    setIsChartReady(true)
+
     // Handle resize
     const handleResize = () => {
-      if (chartContainerRef.current) {
+      if (chartContainerRef.current && chart) {
         chart.applyOptions({ width: chartContainerRef.current.clientWidth })
       }
     }
@@ -186,6 +194,7 @@ export default function Chart({ initialCoinId }: ChartProps) {
 
     return () => {
       window.removeEventListener('resize', handleResize)
+      setIsChartReady(false)
       chart.remove()
       chartRef.current = null
       seriesRefs.current.clear()
@@ -194,7 +203,10 @@ export default function Chart({ initialCoinId }: ChartProps) {
 
   // Initialize RSI chart
   useEffect(() => {
-    if (!rsiChartContainerRef.current || !hasData || !activeIndicators.has('rsi')) return
+    if (!rsiChartContainerRef.current || !hasData || !activeIndicators.has('rsi')) {
+      setIsRsiChartReady(false)
+      return
+    }
 
     // Create RSI chart
     const rsiChart = createChart(rsiChartContainerRef.current, {
@@ -220,9 +232,12 @@ export default function Chart({ initialCoinId }: ChartProps) {
 
     rsiChartRef.current = rsiChart
 
+    // Mark RSI chart as ready after initialization
+    setIsRsiChartReady(true)
+
     // Handle resize
     const handleResize = () => {
-      if (rsiChartContainerRef.current) {
+      if (rsiChartContainerRef.current && rsiChart) {
         rsiChart.applyOptions({ width: rsiChartContainerRef.current.clientWidth })
       }
     }
@@ -231,6 +246,7 @@ export default function Chart({ initialCoinId }: ChartProps) {
 
     return () => {
       window.removeEventListener('resize', handleResize)
+      setIsRsiChartReady(false)
       rsiChart.remove()
       rsiChartRef.current = null
       rsiSeriesRef.current = null
@@ -239,7 +255,8 @@ export default function Chart({ initialCoinId }: ChartProps) {
 
   // Update chart data
   useEffect(() => {
-    if (!chartRef.current || !hasData) return
+    // Wait for chart to be fully initialized before adding data
+    if (!chartRef.current || !hasData || !isChartReady) return
 
     // Safety check: ensure chart methods exist
     if (typeof chartRef.current.addCandlestickSeries !== 'function') {
@@ -249,7 +266,11 @@ export default function Chart({ initialCoinId }: ChartProps) {
 
     // Clear existing series
     seriesRefs.current.forEach(series => {
-      chartRef.current.removeSeries(series)
+      try {
+        chartRef.current.removeSeries(series)
+      } catch (error) {
+        console.warn('Error removing series:', error)
+      }
     })
     seriesRefs.current.clear()
 
@@ -398,44 +419,53 @@ export default function Chart({ initialCoinId }: ChartProps) {
     // Fit content
     chartRef.current.timeScale().fitContent()
 
-  }, [chartData, chartType, activeIndicators, hasData])
+  }, [chartData, chartType, activeIndicators, hasData, isChartReady])
 
   // Update RSI chart data
   useEffect(() => {
-    if (!rsiChartRef.current || !hasData || !activeIndicators.has('rsi')) return
+    // Wait for RSI chart to be fully initialized before adding data
+    if (!rsiChartRef.current || !hasData || !activeIndicators.has('rsi') || !isRsiChartReady) return
 
     // Clear existing RSI series
     if (rsiSeriesRef.current) {
-      rsiChartRef.current.removeSeries(rsiSeriesRef.current)
-      rsiSeriesRef.current = null
+      try {
+        rsiChartRef.current.removeSeries(rsiSeriesRef.current)
+        rsiSeriesRef.current = null
+      } catch (error) {
+        console.warn('Error removing RSI series:', error)
+      }
     }
 
     // Add RSI line
-    const rsiSeries = rsiChartRef.current.addLineSeries({
-      color: '#2962FF',
-      lineWidth: 2,
-      title: 'RSI(14)',
-    })
+    try {
+      const rsiSeries = rsiChartRef.current.addLineSeries({
+        color: '#2962FF',
+        lineWidth: 2,
+        title: 'RSI(14)',
+      })
 
-    const rsiData = chartData
-      .filter(d => d.rsi !== undefined)
-      .map(d => ({
-        time: d.time as UTCTimestamp,
-        value: d.rsi!,
-      }))
+      const rsiData = chartData
+        .filter(d => d.rsi !== undefined)
+        .map(d => ({
+          time: d.time as UTCTimestamp,
+          value: d.rsi!,
+        }))
 
-    rsiSeries.setData(rsiData)
-    rsiSeriesRef.current = rsiSeries
+      rsiSeries.setData(rsiData)
+      rsiSeriesRef.current = rsiSeries
 
-    // Set price scale options for RSI (0-100 range)
-    rsiSeries.priceScale().applyOptions({
-      autoScale: false,
-    })
+      // Set price scale options for RSI (0-100 range)
+      rsiSeries.priceScale().applyOptions({
+        autoScale: false,
+      })
 
-    // Fit content
-    rsiChartRef.current.timeScale().fitContent()
+      // Fit content
+      rsiChartRef.current.timeScale().fitContent()
+    } catch (error) {
+      console.error('Error updating RSI chart:', error)
+    }
 
-  }, [chartData, hasData, activeIndicators])
+  }, [chartData, hasData, activeIndicators, isRsiChartReady])
 
   return (
     <div className="chart-page">

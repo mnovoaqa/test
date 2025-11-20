@@ -1,4 +1,3 @@
-import axios from 'axios'
 import type { NewsArticle, MarketSentiment } from '../types/crypto'
 
 /**
