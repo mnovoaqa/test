@@ -1,0 +1,434 @@
+.chart-page {
+  padding: 2rem;
+  max-width: 1600px;
+  margin: 0 auto;
+}
+
+.chart-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 2rem;
+  flex-wrap: wrap;
+  gap: 1rem;
+}
+
+.chart-title-section {
+  display: flex;
+  align-items: center;
+  gap: 1.5rem;
+}
+
+.chart-title-section h2 {
+  margin: 0;
+  color: var(--text-primary);
+  font-size: 1.8rem;
+}
+
+.coin-search-container {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 300px;
+}
+
+.coin-search-input {
+  padding: 0.6rem 1rem;
+  background: var(--input-bg, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  border-radius: 8px;
+  color: var(--text-primary, rgba(255, 255, 255, 0.9));
+  font-size: 0.95rem;
+  transition: all 0.2s ease;
+}
+
+.coin-search-input:hover {
+  border-color: rgba(102, 126, 234, 0.4);
+}
+
+.coin-search-input:focus {
+  outline: none;
+  border-color: rgba(102, 126, 234, 0.6);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.coin-search-input::placeholder {
+  color: var(--text-tertiary, rgba(255, 255, 255, 0.5));
+}
+
+.coin-select {
+  padding: 0.6rem 1rem;
+  background: var(--input-bg, rgba(255, 255, 255, 0.05));
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  border-radius: 8px;
+  color: var(--text-primary, rgba(255, 255, 255, 0.9));
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.coin-select:hover {
+  border-color: rgba(102, 126, 234, 0.4);
+}
+
+.coin-select:focus {
+  outline: none;
+  border-color: rgba(102, 126, 234, 0.6);
+  box-shadow: 0 0 0 3px rgba(102, 126, 234, 0.1);
+}
+
+.coin-select option {
+  background: var(--bg-gradient-1, #1a1a2e);
+  color: var(--text-primary, rgba(255, 255, 255, 0.9));
+  padding: 0.5rem;
+}
+
+.coin-info {
+  display: flex;
+  gap: 2rem;
+  align-items: center;
+  background: var(--card-bg);
+  padding: 1rem 1.5rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+}
+
+.coin-price {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.price-label,
+.change-label {
+  font-size: 0.75rem;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.price-value {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: var(--text-primary);
+}
+
+.coin-change {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.change-value {
+  font-size: 1.25rem;
+  font-weight: 600;
+}
+
+.coin-change.positive .change-value {
+  color: var(--success-green);
+}
+
+.coin-change.negative .change-value {
+  color: var(--danger-red);
+}
+
+.data-points {
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+}
+
+.chart-controls {
+  display: flex;
+  gap: 2rem;
+  margin-bottom: 1.5rem;
+  flex-wrap: wrap;
+  background: var(--card-bg);
+  padding: 1rem;
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+}
+
+.indicator-status-banner {
+  margin-bottom: 1rem;
+  padding: 1rem 1.5rem;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  border-radius: 8px;
+  font-size: 0.95rem;
+  font-weight: 600;
+  text-align: center;
+  animation: slideDown 0.3s ease-out;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+}
+
+@keyframes slideDown {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.timeframe-selector,
+.indicator-selector,
+.chart-type-selector {
+  display: flex;
+  gap: 0.5rem;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.control-label {
+  font-weight: 600;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  margin-right: 0.5rem;
+}
+
+.timeframe-btn,
+.indicator-btn,
+.chart-type-btn {
+  padding: 0.5rem 1rem;
+  background: var(--bg-primary);
+  border: 1px solid var(--border-color);
+  border-radius: 6px;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-weight: 500;
+}
+
+.timeframe-btn:hover,
+.indicator-btn:hover,
+.chart-type-btn:hover {
+  background: var(--card-bg);
+  border-color: var(--accent-blue);
+  color: var(--text-primary);
+}
+
+.timeframe-btn.active,
+.indicator-btn.active,
+.chart-type-btn.active {
+  background: var(--accent-blue);
+  border-color: var(--accent-blue);
+  color: white;
+}
+
+.chart-wrapper {
+  position: relative;
+  min-height: 500px;
+}
+
+.chart-container {
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  margin-bottom: 1rem;
+  background: var(--surface, rgba(255, 255, 255, 0.05));
+}
+
+.lightweight-chart {
+  width: 100%;
+  height: 100%;
+  min-height: 500px;
+}
+
+.chart-empty-state {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--card-bg);
+  border-radius: 12px;
+  border: 1px solid var(--border-color);
+  z-index: 10;
+}
+
+.empty-state-content {
+  text-align: center;
+  padding: 3rem 2rem;
+  max-width: 500px;
+}
+
+.empty-state-icon {
+  width: 80px;
+  height: 80px;
+  margin: 0 auto 1.5rem;
+  color: var(--accent-blue);
+  opacity: 0.6;
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.4;
+  }
+  50% {
+    opacity: 0.8;
+  }
+}
+
+.empty-state-content h3 {
+  margin: 0 0 1rem;
+  color: var(--text-primary);
+  font-size: 1.5rem;
+  font-weight: 600;
+}
+
+.empty-state-content p {
+  margin: 0.5rem 0;
+  color: var(--text-secondary);
+  font-size: 1rem;
+  line-height: 1.6;
+}
+
+.data-status {
+  margin-top: 1.5rem !important;
+  padding: 0.75rem 1.5rem;
+  background: var(--bg-primary);
+  border-radius: 8px;
+  display: inline-block;
+}
+
+.data-status strong {
+  color: var(--accent-blue);
+  font-size: 1.1rem;
+}
+
+.wait-message {
+  margin-top: 1rem !important;
+  font-size: 0.9rem !important;
+  opacity: 0.7;
+}
+
+.loading-spinner {
+  width: 60px;
+  height: 60px;
+  margin: 0 auto 1.5rem;
+  border: 4px solid var(--border-color);
+  border-top-color: var(--accent-blue);
+  border-radius: 50%;
+  animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.rsi-container {
+  position: relative;
+  border-radius: 12px;
+  overflow: hidden;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  margin-top: 1rem;
+  background: var(--surface, rgba(255, 255, 255, 0.05));
+  min-height: 150px;
+}
+
+.rsi-container .lightweight-chart {
+  min-height: 150px;
+}
+
+.rsi-label {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  background: var(--surface, rgba(0, 0, 0, 0.6));
+  backdrop-filter: blur(8px);
+  padding: 0.25rem 0.75rem;
+  border-radius: 6px;
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  z-index: 10;
+}
+
+.chart-info {
+  margin-top: 1.5rem;
+  padding: 1rem;
+  background: var(--card-bg);
+  border-radius: 8px;
+  border-left: 4px solid var(--accent-blue);
+}
+
+.info-text {
+  margin: 0;
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
+
+.info-text strong {
+  color: var(--text-primary);
+}
+
+.chart-tooltip {
+  background: var(--surface, rgba(26, 26, 26, 0.95));
+  backdrop-filter: blur(10px);
+  border: 1px solid var(--border, rgba(255, 255, 255, 0.1));
+  border-radius: 8px;
+  padding: 0.75rem 1rem;
+  box-shadow: 0 4px 6px var(--shadow, rgba(0, 0, 0, 0.3));
+}
+
+.tooltip-time {
+  margin: 0 0 0.5rem;
+  font-size: 0.85rem;
+  color: var(--text-secondary);
+  border-bottom: 1px solid var(--border-color);
+  padding-bottom: 0.5rem;
+}
+
+.tooltip-item {
+  margin: 0.25rem 0;
+  font-size: 0.9rem;
+  color: var(--text-secondary);
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.tooltip-item span {
+  color: var(--text-primary);
+  font-weight: 600;
+  font-family: 'Courier New', monospace;
+}
+
+@media (max-width: 768px) {
+  .chart-page {
+    padding: 1rem;
+  }
+
+  .chart-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .coin-info {
+    width: 100%;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .chart-controls {
+    flex-direction: column;
+    gap: 1rem;
+  }
+
+  .timeframe-selector,
+  .indicator-selector {
+    width: 100%;
+  }
+}

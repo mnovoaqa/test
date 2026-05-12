@@ -7,11 +7,21 @@ import './Today.css';
 
 export default function Today() {
   const [meals, setMeals] = useState<Meal[]>([]);
-  const [goals, setGoals] = useState<Goals>(getGoals());
+  const [goals, setGoals] = useState<Goals>({
+    calories: 2000,
+    protein: 150,
+    carbs: 250,
+    fat: 65,
+  });
   const [showAddMeal, setShowAddMeal] = useState(false);
   const [trendData, setTrendData] = useState<any[]>([]);
 
   const today = format(new Date(), 'yyyy-MM-dd');
+
+  // Load goals on mount
+  useEffect(() => {
+    getGoals().then(setGoals);
+  }, []);
 
   useEffect(() => {
     loadData();

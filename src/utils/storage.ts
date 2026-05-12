@@ -1,6 +1,5 @@
 import type { AppData, Goals, DayData, Meal } from '../types';
 import { supabase } from '../lib/supabase';
-import { format } from 'date-fns';
 
 const defaultGoals: Goals = {
   calories: 2000,
@@ -95,7 +94,7 @@ export const addMeal = async (date: string, meal: Meal): Promise<void> => {
   });
 };
 
-export const updateMeal = async (date: string, mealId: string, updatedMeal: Meal): Promise<void> => {
+export const updateMeal = async (_date: string, mealId: string, updatedMeal: Meal): Promise<void> => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
@@ -112,7 +111,7 @@ export const updateMeal = async (date: string, mealId: string, updatedMeal: Meal
     .eq('user_id', user.id);
 };
 
-export const deleteMeal = async (date: string, mealId: string): Promise<void> => {
+export const deleteMeal = async (_date: string, mealId: string): Promise<void> => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('User not authenticated');
 
@@ -176,7 +175,7 @@ export const saveGoals = async (goals: Goals): Promise<void> => {
 };
 
 // Keep saveDayData for backward compatibility (not used with Supabase)
-export const saveDayData = async (dayData: DayData): Promise<void> => {
+export const saveDayData = async (_dayData: DayData): Promise<void> => {
   // This function is not needed with Supabase as we handle individual meals
   console.warn('saveDayData is deprecated with Supabase');
 };

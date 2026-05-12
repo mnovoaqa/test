@@ -1,54 +1,48 @@
 import { useState, useEffect } from 'react'
 import './App.css'
-import Today from './pages/Today'
-import History from './pages/History'
-import Settings from './pages/Settings'
-import Auth from './pages/Auth'
-import { AuthProvider, useAuth } from './contexts/AuthContext'
-import { migrateLocalDataToSupabase, hasBeenMigrated } from './utils/migration'
+import Dashboard from './pages/Dashboard'
+import Watchlist from './pages/Watchlist'
+import CryptoSettings from './pages/CryptoSettings'
+import Chart from './pages/Chart'
+import AlertHistory from './components/AlertHistory'
+import TradeCalculator from './components/TradeCalculator'
+import { useCryptoStore } from './stores/cryptoStore'
 
-type Page = 'today' | 'history' | 'settings'
+type Page = 'dashboard' | 'watchlist' | 'chart' | 'alerts' | 'calculator' | 'settings'
 
-function AppContent() {
-  const [currentPage, setCurrentPage] = useState<Page>('today')
-  const [migrating, setMigrating] = useState(false)
-  const { user, loading, signOut } = useAuth()
+function App() {
+  const [currentPage, setCurrentPage] = useState<Page>('dashboard')
+  const [selectedChartCoin, setSelectedChartCoin] = useState<string | null>(null)
+  const { settings } = useCryptoStore()
 
   useEffect(() => {
-    // Migrate local data when user logs in for the first time
-    if (user && !hasBeenMigrated()) {
-      setMigrating(true)
-      migrateLocalDataToSupabase().then(() => {
-        setMigrating(false)
-      })
+    // Apply theme on mount
+    document.documentElement.setAttribute('data-theme', settings.theme)
+  }, [settings.theme])
+
+  const navigateToChart = (coinId?: string) => {
+    setCurrentPage('chart')
+    if (coinId) {
+      setSelectedChartCoin(coinId)
     }
-  }, [user])
-
-  if (loading || migrating) {
-    return (
-      <div className="app loading-screen">
-        <div className="loading-content">
-          <span className="loading-icon">🥗</span>
-          <p>{migrating ? 'Migrating your data...' : 'Loading...'}</p>
-        </div>
-      </div>
-    )
-  }
-
-  if (!user) {
-    return <Auth />
   }
 
   const renderPage = () => {
     switch (currentPage) {
-      case 'today':
-        return <Today />
-      case 'history':
-        return <History />
+      case 'dashboard':
+        return <Dashboard onNavigateToChart={navigateToChart} />
+      case 'watchlist':
+        return <Watchlist onNavigateToChart={navigateToChart} />
+      case 'chart':
+        return <Chart initialCoinId={selectedChartCoin} />
+      case 'alerts':
+        return <AlertHistory />
+      case 'calculator':
+        return <TradeCalculator />
       case 'settings':
-        return <Settings />
+        return <CryptoSettings />
       default:
-        return <Today />
+        return <Dashboard />
     }
   }
 
@@ -56,37 +50,57 @@ function AppContent() {
     <div className="app">
       <nav className="navbar">
         <div className="nav-brand">
-          <span className="brand-icon">🥗</span>
-          <h1>Macro Tracker</h1>
+          <span className="brand-icon">₿</span>
+          <h1>Crypto Alert Dashboard</h1>
         </div>
         <div className="nav-links">
           <button
-            className={`nav-link ${currentPage === 'today' ? 'active' : ''}`}
-            onClick={() => setCurrentPage('today')}
+            className={`nav-link ${currentPage === 'dashboard' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('dashboard')}
+            title="Dashboard"
           >
             <span className="nav-icon">📊</span>
-            Today
+            Dashboard
           </button>
           <button
-            className={`nav-link ${currentPage === 'history' ? 'active' : ''}`}
-            onClick={() => setCurrentPage('history')}
+            className={`nav-link ${currentPage === 'watchlist' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('watchlist')}
+            title="Watchlist"
           >
-            <span className="nav-icon">📅</span>
-            History
+            <span className="nav-icon">⭐</span>
+            Watchlist
+          </button>
+          <button
+            className={`nav-link ${currentPage === 'chart' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('chart')}
+            title="Live Chart"
+          >
+            <span className="nav-icon">📈</span>
+            Chart
+          </button>
+          <button
+            className={`nav-link ${currentPage === 'alerts' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('alerts')}
+            title="Alerts"
+          >
+            <span className="nav-icon">🔔</span>
+            Alerts
+          </button>
+          <button
+            className={`nav-link ${currentPage === 'calculator' ? 'active' : ''}`}
+            onClick={() => setCurrentPage('calculator')}
+            title="Trade Calculator"
+          >
+            <span className="nav-icon">🧮</span>
+            Calculator
           </button>
           <button
             className={`nav-link ${currentPage === 'settings' ? 'active' : ''}`}
             onClick={() => setCurrentPage('settings')}
+            title="Settings"
           >
             <span className="nav-icon">⚙️</span>
             Settings
-          </button>
-          <button
-            className="nav-link logout"
-            onClick={signOut}
-          >
-            <span className="nav-icon">🚪</span>
-            Logout
           </button>
         </div>
       </nav>
@@ -94,14 +108,6 @@ function AppContent() {
         {renderPage()}
       </main>
     </div>
-  )
-}
-
-function App() {
-  return (
-    <AuthProvider>
-      <AppContent />
-    </AuthProvider>
   )
 }
 
