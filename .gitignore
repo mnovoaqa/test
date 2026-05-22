@@ -42,3 +42,11 @@ __pycache__/
 # VOXFORGE generated audio (large, rebuilt by `python -m voxforge demo`)
 voxforge/output/
 
+# Gradio runtime cache (certs, flagged samples, etc.)
+voxforge/.gradio/
+.gradio/
+
+# Python venvs
+voxforge/.venv/
+.venv/
+
