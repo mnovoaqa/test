@@ -6,5 +6,6 @@ librosa>=0.10
 pyloudnorm>=0.1.1
 numba>=0.58
 pytest>=7.0
+gradio>=6.0
 # Optional, only needed for the LLM lyric path:
 # anthropic>=0.39
