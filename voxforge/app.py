@@ -24,6 +24,11 @@ sys.path.insert(0, str(Path(__file__).parent))
 from voxforge import pipeline, io_utils, demo_vocal
 from voxforge.lyrics import generate_lyrics
 from voxforge.presets import list_genres, list_tune_styles, GENRE_PRESETS
+try:
+    from voxforge import song_synth, voice_clone
+    HAS_VOICE_CLONE = True
+except Exception:
+    HAS_VOICE_CLONE = False
 
 
 # Where to write outputs (Gradio will serve them back as audio components)
@@ -96,6 +101,56 @@ def write_lyrics(
         seed=seed, use_llm=use_llm,
     )
     return song.render()
+
+
+def sing_in_my_voice(
+    reference_path: str | None,
+    lyrics_text: str,
+    genre: str,
+    tune_style: str,
+    tune_strength: int,
+    clone_exaggeration: float,
+    clone_cfg: float,
+    pause_ms: int,
+    seed: int,
+    progress=gr.Progress(track_tqdm=False),
+):
+    if not HAS_VOICE_CLONE:
+        raise gr.Error("Voice cloning module not installed. `pip install chatterbox-tts`.")
+    if not reference_path:
+        raise gr.Error("Upload or record a short reference of your voice (5–15 seconds).")
+    if not lyrics_text or not lyrics_text.strip():
+        raise gr.Error("Paste lyrics in the text box (or use the Lyrics tab to generate some first).")
+    tune = None if tune_style == "auto" else tune_style
+    basename = f"sing_{int(seed)}"
+
+    def _log(msg):
+        progress(0.5, desc=str(msg))
+
+    result = song_synth.synth_song(
+        reference_voice_path=reference_path,
+        lyrics_text=lyrics_text,
+        genre=genre,
+        tune_style=tune,
+        tune_strength=int(tune_strength),
+        clone_exaggeration=float(clone_exaggeration),
+        clone_cfg=float(clone_cfg),
+        pause_ms=int(pause_ms),
+        seed=int(seed),
+        out_dir=str(OUT_DIR),
+        basename=basename,
+        progress=_log,
+    )
+    info = (
+        f"**Key:** {result.info['key']}   **BPM:** {result.info['bpm']:.1f}   "
+        f"**Tune:** {result.info['tune_preset']}\n\n"
+        f"**Mastered to:** {result.info['lufs_final']:.2f} LUFS, "
+        f"**True peak:** {result.info['true_peak_dbfs']:.2f} dBTP"
+    )
+    return (
+        result.master_path, result.instrumental_path,
+        result.acapella_path, result.info["dry_clone_path"], info,
+    )
 
 
 def run_demo(
@@ -237,6 +292,46 @@ with gr.Blocks(title="VOXFORGE — Voice to Song", css=CSS,
                 inputs=[theme_in, lyr_genre_in, verses_in, bars_in,
                         hook_in, intro_in, lyr_seed_in, llm_in],
                 outputs=[lyr_out],
+            )
+
+        # ----- SING IN MY VOICE -------------------------------------------
+        with gr.Tab("🎙️ Sing in My Voice"):
+            gr.Markdown(
+                "Upload a short clip of your voice (5–15 seconds, speaking is fine), "
+                "paste the lyrics you want performed, hit go. The system clones your voice "
+                "and renders a full song. **CPU-only** — expect 8–15 minutes per song. "
+                "GPU would be ~30× faster.")
+            with gr.Row():
+                with gr.Column(scale=1):
+                    s_ref = gr.Audio(label="Your voice reference (5–15s)",
+                                      sources=["upload", "microphone"], type="filepath")
+                    s_lyrics = gr.Textbox(label="Lyrics", lines=12,
+                                          placeholder="Paste lyrics here, or generate them in the Lyrics tab first.")
+                    s_genre = gr.Dropdown(choices=list_genres(), value="boom_bap", label="Genre")
+                    s_tune = gr.Dropdown(choices=["auto"] + list_tune_styles(),
+                                          value="natural", label="Auto-tune style")
+                    s_strength = gr.Slider(0, 100, value=55, step=1, label="Tune strength")
+                    with gr.Accordion("Voice clone settings", open=False):
+                        s_exag = gr.Slider(0, 1, value=0.55, step=0.05,
+                                            label="Expressiveness (higher = more emotion)")
+                        s_cfg = gr.Slider(0, 1, value=0.55, step=0.05,
+                                           label="Reference adherence")
+                        s_pause = gr.Slider(100, 800, value=300, step=20,
+                                             label="Pause between lines (ms)")
+                        s_seed = gr.Number(value=808, precision=0, label="Seed")
+                    s_btn = gr.Button("🎙️  SYNTHESIZE SONG", variant="primary",
+                                       elem_classes="pro-btn")
+                with gr.Column(scale=1):
+                    s_info = gr.Markdown()
+                    s_master = gr.Audio(label="Master", type="filepath")
+                    s_instr = gr.Audio(label="Instrumental", type="filepath")
+                    s_voc = gr.Audio(label="Acapella (cloned + tuned)", type="filepath")
+                    s_dry = gr.Audio(label="Dry clone (before processing)", type="filepath")
+            s_btn.click(
+                sing_in_my_voice,
+                inputs=[s_ref, s_lyrics, s_genre, s_tune, s_strength,
+                        s_exag, s_cfg, s_pause, s_seed],
+                outputs=[s_master, s_instr, s_voc, s_dry, s_info],
             )
 
         # ----- DEMO --------------------------------------------------------

@@ -161,6 +161,44 @@ def cmd_demo(args: argparse.Namespace) -> int:
     return 0
 
 
+def cmd_sing(args: argparse.Namespace) -> int:
+    """Voice-clone the user's voice and render a full song with new lyrics."""
+    from . import song_synth
+    if args.lyrics_file:
+        lyrics_text = Path(args.lyrics_file).read_text()
+    else:
+        lyrics_text = None  # will be auto-generated inside song_synth
+    result = song_synth.synth_song(
+        reference_voice_path=args.reference,
+        lyrics_text=lyrics_text,
+        lyrics_theme=args.lyrics_theme,
+        lyrics_genre=args.genre,
+        lyrics_verses=args.lyrics_verses,
+        lyrics_bars=args.lyrics_bars,
+        lyrics_seed=args.lyrics_seed,
+        genre=args.genre,
+        tune_style=args.tune,
+        tune_strength=args.tune_strength,
+        energy=args.energy if args.energy is not None else 0.45,
+        warmth=args.warmth,
+        seed=args.seed,
+        out_dir=args.out,
+        basename=args.basename,
+        clone_exaggeration=args.clone_exaggeration,
+        clone_cfg=args.clone_cfg,
+        pause_ms=args.pause_ms,
+    )
+    print(json.dumps({
+        "master": result.master_path,
+        "instrumental": result.instrumental_path,
+        "acapella": result.acapella_path,
+        "lyrics": result.lyrics_path,
+        "voice_ref": result.voice_ref_path,
+        "info": result.info,
+    }, indent=2, default=str))
+    return 0
+
+
 def cmd_presets(args: argparse.Namespace) -> int:
     print("GENRES:")
     for g, p in GENRE_PRESETS.items():
@@ -247,6 +285,33 @@ def build_parser() -> argparse.ArgumentParser:
     d.add_argument("--lyrics-seed", type=int, default=None)
     d.add_argument("--lyrics-llm", action="store_true")
     d.set_defaults(func=cmd_demo)
+
+    # sing — voice-clone + synth full song with new lyrics
+    s = sub.add_parser("sing", help="Voice-clone your voice and render a full song with new lyrics")
+    s.add_argument("--reference", required=True,
+                   help="Path to a vocal clip of YOUR voice (>= 5s, any format)")
+    s.add_argument("--lyrics-file", default=None,
+                   help="Path to markdown/text lyrics file. If omitted, lyrics are auto-generated.")
+    s.add_argument("--out", default="output")
+    s.add_argument("--basename", default="my_song")
+    s.add_argument("--genre", choices=list_genres(), default="boom_bap")
+    s.add_argument("--tune", choices=list_tune_styles(), default=None)
+    s.add_argument("--tune-strength", type=int, default=55)
+    s.add_argument("--energy", type=float, default=None)
+    s.add_argument("--warmth", type=float, default=0.5)
+    s.add_argument("--seed", type=int, default=808)
+    s.add_argument("--clone-exaggeration", type=float, default=0.55,
+                   help="0..1; higher = more expressive cloned vocal")
+    s.add_argument("--clone-cfg", type=float, default=0.55,
+                   help="0..1; higher = closer match to reference voice")
+    s.add_argument("--pause-ms", type=int, default=300,
+                   help="Pause inserted between cloned lines")
+    s.add_argument("--lyrics-theme", default="reflection",
+                   choices=["hustle", "love", "struggle", "party", "flex", "reflection"])
+    s.add_argument("--lyrics-verses", type=int, default=2)
+    s.add_argument("--lyrics-bars", type=int, default=8)
+    s.add_argument("--lyrics-seed", type=int, default=None)
+    s.set_defaults(func=cmd_sing)
 
     # presets
     pr = sub.add_parser("presets", help="List available presets")
