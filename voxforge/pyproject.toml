@@ -1,0 +1,29 @@
+[project]
+name = "voxforge"
+version = "0.1.0"
+description = "Voice-to-Song DAW pipeline: auto-tune, beat gen, mix, master, lyric gen for hip-hop / R&B / rap."
+requires-python = ">=3.10"
+dependencies = [
+    "numpy>=1.24",
+    "scipy>=1.10",
+    "soundfile>=0.12",
+    "soxr>=0.4",
+    "librosa>=0.10",
+    "pyloudnorm>=0.1.1",
+    "numba>=0.58",
+]
+
+[project.optional-dependencies]
+llm = ["anthropic>=0.39"]
+test = ["pytest>=7.0"]
+
+[project.scripts]
+voxforge = "voxforge.cli:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+include = ["voxforge*"]
+exclude = ["tests*", "output*", "examples*"]
